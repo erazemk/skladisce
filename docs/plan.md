@@ -300,6 +300,7 @@ skladisce/
 │   └── embed.go                 — go:embed directives for static/ and templates/
 ├── docs/
 │   └── plan.md                  — this document
+├── AGENTS.md                    — agent instructions (build, test, conventions)
 ├── Makefile
 ├── go.mod
 └── README.md
@@ -439,3 +440,118 @@ Examples:
 | New transfer   | `GET /transfers/new`| all       | Form: pick item, from, to, quantity         |
 | Settings       | `GET /settings`     | all       | Change own password                         |
 | Users          | `GET /users`        | admin     | User management (create, reset passwords)   |
+
+## Agent-First Development
+
+This project is developed entirely by AI agents with human guidance. The
+repository includes conventions and tooling to make agent-driven development
+reliable and self-verifying.
+
+### AGENTS.md
+
+An `AGENTS.md` file at the repository root provides agents with everything they
+need to work on the codebase. It is loaded automatically by pi at session start.
+
+**Contents of AGENTS.md:**
+
+1. **Build & verify commands** — the exact commands to build, test, lint, and
+   run the project. Agents must be able to verify their own work.
+   ```
+   make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
+   make test           — go test ./...
+   make lint           — go vet ./...
+   make run            — build + run serve with default flags
+   ```
+
+2. **Architecture overview** — the layer diagram so agents understand where
+   code belongs:
+   ```
+   cmd/server/main.go → internal/api/  (JSON)  → internal/store/ → internal/db/
+                       → internal/web/  (HTML)  → internal/store/ → internal/db/
+   ```
+
+3. **Code conventions** — rules agents must follow:
+   - All code in English; all template UI text in Slovenian.
+   - Error handling: return errors, don't panic. Use `fmt.Errorf("doing X: %w", err)`.
+   - HTTP handlers: parse input → call store → write response. No business logic
+     in handlers.
+   - Store functions accept `context.Context` as first argument.
+   - Transactions: any operation touching `inventory` + `transfers` must be in a
+     single `BEGIN IMMEDIATE` transaction.
+   - Models are plain structs with JSON tags. No ORM.
+   - Tests use a fresh in-memory SQLite database per test function.
+
+4. **File placement rules** — so agents never put code in the wrong package:
+   - New API endpoint → `internal/api/<resource>.go` + register in `router.go`
+   - New page → `internal/web/<resource>.go` + template in `web/templates/`
+   - New DB query → `internal/store/<resource>.go`
+   - New data type → `internal/model/<resource>.go`
+   - Schema change → `internal/db/migrations.go` (append new migration)
+
+5. **Testing requirements** — agents must verify their work:
+   - Run `make build` — must compile with CGO_ENABLED=0.
+   - Run `make test` — all tests must pass.
+   - Run `make lint` — no warnings.
+   - When adding a new store function, add a test in the same package.
+   - When adding a new API endpoint, add an integration test that starts an
+     HTTP server with a test database.
+
+6. **Commit conventions** — agents should use conventional commits:
+   - `feat:` new features
+   - `fix:` bug fixes
+   - `docs:` documentation changes
+   - `refactor:` code restructuring
+   - `test:` adding/updating tests
+
+### Makefile
+
+The `Makefile` is the single entry point for all operations. Agents should
+always use `make` targets rather than running raw commands, ensuring consistency.
+
+```makefile
+.PHONY: build test lint run clean
+
+build:
+	CGO_ENABLED=0 go build -o skladisce ./cmd/server
+
+test:
+	go test ./...
+
+lint:
+	go vet ./...
+
+run: build
+	./skladisce serve
+
+clean:
+	rm -f skladisce
+```
+
+### Test Infrastructure
+
+Tests use an in-memory SQLite database created per test. A shared test helper
+in `internal/db/testdb.go` provides:
+
+```go
+// testdb.go
+func NewTestDB(t *testing.T) *sql.DB {
+    // Opens :memory: database, runs all migrations, returns ready-to-use DB.
+}
+```
+
+This ensures:
+- Tests are fast (no disk I/O).
+- Tests are isolated (no shared state).
+- Schema is always up-to-date (migrations run on every test DB).
+
+### Documentation as Source of Truth
+
+Agents should always read `docs/plan.md` before making architectural decisions.
+The plan documents:
+- The database schema (authoritative — code must match).
+- API endpoints and their permission requirements.
+- Edge cases and business rules.
+- Frontend pages and routing.
+
+If the plan and code disagree, the plan wins. Update the plan first, then the
+code.
