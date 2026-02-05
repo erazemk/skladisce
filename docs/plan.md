@@ -1,0 +1,213 @@
+# Skladišče — Inventory Management System
+
+Backend service for tracking physical inventory items and who borrows them from
+storage rooms. Built in Go with SQLite, compiled as a static binary (no CGO).
+
+## Concept: Unified Owner Model
+
+Every item movement is a **transfer** between **owners**. An owner is either a
+`person` or a `location`. An item's quantity is always distributed across owners.
+
+- **Borrowing** = transfer from location → person
+- **Returning** = transfer from person → location
+- **Handoff** = transfer from person → person
+
+There is no separate borrow/return logic — it's all transfers.
+
+## Tech Stack
+
+| Component       | Choice                         | Reason                               |
+| --------------- | ------------------------------ | ------------------------------------ |
+| Language         | Go                             | Requirement                          |
+| Database         | SQLite via `modernc.org/sqlite` | Pure Go, no CGO needed              |
+| Router           | `net/http` (Go 1.22+ ServeMux) | Pattern matching built-in, zero deps |
+| Auth             | JWT (`golang-jwt/jwt/v5`)      | Stateless, simple                    |
+| Password hashing | `golang.org/x/crypto/bcrypt`   | Standard, battle-tested              |
+| Build            | `CGO_ENABLED=0 go build`       | Static binary                        |
+
+## Database Schema
+
+```sql
+-- Authentication users (separate from owners — a person owner doesn't need a login)
+CREATE TABLE users (
+    id            INTEGER PRIMARY KEY,
+    username      TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at    DATETIME
+);
+
+-- Unified: people and storage locations
+CREATE TABLE owners (
+    id         INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    type       TEXT NOT NULL CHECK (type IN ('person', 'location')),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
+);
+
+-- Item types (quantity-based, not individual tracking)
+CREATE TABLE items (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    description TEXT,
+    image       BLOB,
+    image_mime  TEXT,
+    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'retired')),
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at  DATETIME
+);
+
+-- Current distribution: who/where holds how many of what
+CREATE TABLE inventory (
+    item_id   INTEGER NOT NULL REFERENCES items(id),
+    owner_id  INTEGER NOT NULL REFERENCES owners(id),
+    quantity  INTEGER NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (item_id, owner_id)
+);
+
+-- Audit log: every movement
+CREATE TABLE transfers (
+    id             INTEGER PRIMARY KEY,
+    item_id        INTEGER NOT NULL REFERENCES items(id),
+    from_owner_id  INTEGER NOT NULL REFERENCES owners(id),
+    to_owner_id    INTEGER NOT NULL REFERENCES owners(id),
+    quantity       INTEGER NOT NULL CHECK (quantity > 0),
+    notes          TEXT,
+    transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    transferred_by INTEGER REFERENCES users(id)
+);
+```
+
+### Key Design Decisions
+
+- **`users` is separate from `owners`** — not every person in the system needs
+  a login, and not every login maps to a person owner.
+- **`inventory` is the current state** (denormalized for fast queries);
+  **`transfers` is the audit log**.
+- Both must stay in sync (wrapped in transactions).
+- **Soft delete** via `deleted_at` on users, owners, and items — preserves all
+  history.
+
+## API Endpoints
+
+### Auth
+
+```
+POST   /api/auth/register          — create account (admin-only after first user)
+POST   /api/auth/login             — get JWT token
+```
+
+### Users (admin only)
+
+```
+GET    /api/users                  — list users
+GET    /api/users/:id              — get user
+PUT    /api/users/:id              — update user role
+DELETE /api/users/:id              — soft delete user
+```
+
+### Owners
+
+```
+GET    /api/owners                 — list (filter by ?type=person|location)
+POST   /api/owners                 — create person or location
+GET    /api/owners/:id             — get owner details
+PUT    /api/owners/:id             — update owner
+DELETE /api/owners/:id             — soft delete (fails if holding inventory)
+GET    /api/owners/:id/inventory   — what items this owner holds
+```
+
+### Items
+
+```
+GET    /api/items                  — list (filter by ?status=active)
+POST   /api/items                  — create item type
+GET    /api/items/:id              — get item details + distribution
+PUT    /api/items/:id              — update item metadata/status
+DELETE /api/items/:id              — soft delete
+PUT    /api/items/:id/image        — upload image (multipart)
+GET    /api/items/:id/image        — serve image blob
+GET    /api/items/:id/history      — transfer history for this item
+```
+
+### Transfers (the core operation)
+
+```
+POST   /api/transfers              — move N of item X from owner A → owner B
+GET    /api/transfers              — list (filter by ?item_id, ?owner_id, ?from, ?to, ?since)
+```
+
+### Inventory
+
+```
+GET    /api/inventory              — full overview (all items × all holders)
+POST   /api/inventory/stock        — add initial stock (admin: creates quantity at a location)
+POST   /api/inventory/adjust       — adjust quantity (admin: correct errors, mark lost)
+```
+
+## Project Structure
+
+```
+skladisce/
+├── cmd/server/
+│   └── main.go                  — entry point, config, startup
+├── internal/
+│   ├── api/
+│   │   ├── router.go            — route registration
+│   │   ├── middleware.go         — auth middleware, logging, CORS
+│   │   ├── auth.go              — login/register handlers
+│   │   ├── users.go             — user management handlers
+│   │   ├── owners.go            — owner CRUD handlers
+│   │   ├── items.go             — item CRUD + image handlers
+│   │   ├── transfers.go         — transfer handlers
+│   │   ├── inventory.go         — inventory/stock handlers
+│   │   └── response.go          — JSON response helpers
+│   ├── db/
+│   │   ├── db.go                — connection setup, pragmas
+│   │   └── migrations.go        — schema migrations
+│   ├── store/
+│   │   ├── users.go             — user DB queries
+│   │   ├── owners.go            — owner DB queries
+│   │   ├── items.go             — item DB queries
+│   │   ├── transfers.go         — transfer + inventory queries (transactional)
+│   │   └── inventory.go         — inventory queries
+│   ├── model/
+│   │   ├── user.go
+│   │   ├── owner.go
+│   │   ├── item.go
+│   │   └── transfer.go
+│   └── auth/
+│       └── jwt.go               — token generation/validation
+├── docs/
+│   └── plan.md                  — this document
+├── Makefile
+├── go.mod
+└── README.md
+```
+
+## Edge Cases & Business Rules
+
+| Edge case                      | Handling                                                              |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Transfer more than held        | Reject: check `inventory.quantity >= requested` in transaction        |
+| Transfer to self               | Reject: `from_owner_id != to_owner_id`                               |
+| Delete owner holding items     | Reject: must transfer all items away first                            |
+| Delete item with inventory     | Soft-delete only; inventory remains queryable for history             |
+| Concurrent transfers           | SQLite serialized transactions; `BEGIN IMMEDIATE` to avoid SQLITE_BUSY |
+| First user registration        | Auto-assign `admin` role; subsequent registrations require admin      |
+| Image upload                   | Validate MIME type (jpg/png/webp), enforce size limit (~5 MB)         |
+| Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
+| Adjust for lost items          | Admin uses `/inventory/adjust` with negative delta + notes            |
+| Status change to `retired`     | Informational flag; doesn't block transfers (admin decision)          |
+
+## Auth Flow
+
+1. First user to register becomes admin.
+2. Admin creates additional users (or enables open registration).
+3. `POST /api/auth/login` → returns JWT with `{user_id, role, exp}`.
+4. All other endpoints require `Authorization: Bearer <token>`.
+5. **Admin-only:** user management, stock adjustments, item/owner deletion.
+6. **Regular users:** create transfers, view inventory and history.
