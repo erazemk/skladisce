@@ -16,14 +16,16 @@ There is no separate borrow/return logic — it's all transfers.
 
 ## Tech Stack
 
-| Component       | Choice                         | Reason                               |
-| --------------- | ------------------------------ | ------------------------------------ |
-| Language         | Go                             | Requirement                          |
-| Database         | SQLite via `modernc.org/sqlite` | Pure Go, no CGO needed              |
-| Router           | `net/http` (Go 1.22+ ServeMux) | Pattern matching built-in, zero deps |
-| Auth             | JWT (`golang-jwt/jwt/v5`)      | Stateless, simple                    |
-| Password hashing | `golang.org/x/crypto/bcrypt`   | Standard, battle-tested              |
-| Build            | `CGO_ENABLED=0 go build`       | Static binary                        |
+| Component        | Choice                         | Reason                               |
+| ---------------- | ------------------------------ | ------------------------------------ |
+| Language          | Go                             | Requirement                          |
+| Database          | SQLite via `modernc.org/sqlite` | Pure Go, no CGO needed              |
+| Router            | `net/http` (Go 1.22+ ServeMux) | Pattern matching built-in, zero deps |
+| Auth              | JWT (`golang-jwt/jwt/v5`)      | Stateless, simple                    |
+| Password hashing  | `golang.org/x/crypto/bcrypt`   | Standard, battle-tested              |
+| Frontend          | Go templates + htmx            | Server-rendered, ~14 KB JS, no build step |
+| Static embedding  | `go:embed`                     | Single binary, no external files     |
+| Build             | `CGO_ENABLED=0 go build`       | Static binary                        |
 
 ## Database Schema
 
@@ -166,18 +168,28 @@ POST   /api/inventory/adjust       — adjust quantity (correct errors, losses) 
 ```
 skladisce/
 ├── cmd/server/
-│   └── main.go                  — entry point, config, startup
+│   └── main.go                  — entry point, config, startup, seed-admin subcommand
 ├── internal/
-│   ├── api/
-│   │   ├── router.go            — route registration
+│   ├── api/                     — JSON API handlers (/api/*)
+│   │   ├── router.go            — API route registration
 │   │   ├── middleware.go         — auth middleware, logging, CORS
-│   │   ├── auth.go              — login handler
+│   │   ├── auth.go              — login handler (JSON)
 │   │   ├── users.go             — user management handlers
 │   │   ├── owners.go            — owner CRUD handlers
 │   │   ├── items.go             — item CRUD + image handlers
 │   │   ├── transfers.go         — transfer handlers
 │   │   ├── inventory.go         — inventory/stock handlers
 │   │   └── response.go          — JSON response helpers
+│   ├── web/                     — page handlers (/*), server-rendered HTML
+│   │   ├── router.go            — page route registration
+│   │   ├── middleware.go         — cookie auth, redirect to /login
+│   │   ├── templates.go         — template loading, rendering helpers
+│   │   ├── auth.go              — GET/POST /login, logout
+│   │   ├── dashboard.go         — GET /
+│   │   ├── items.go             — item pages + htmx fragment handlers
+│   │   ├── owners.go            — owner pages + htmx fragment handlers
+│   │   ├── transfers.go         — transfer pages + htmx fragment handlers
+│   │   └── users.go             — user management pages (admin)
 │   ├── db/
 │   │   ├── db.go                — connection setup, pragmas
 │   │   └── migrations.go        — schema migrations
@@ -194,6 +206,22 @@ skladisce/
 │   │   └── transfer.go
 │   └── auth/
 │       └── jwt.go               — token generation/validation
+├── web/
+│   ├── static/
+│   │   ├── htmx.min.js          — vendored htmx (~14 KB gzipped)
+│   │   └── style.css            — minimal custom styles
+│   ├── templates/
+│   │   ├── layout.html          — base layout: head, nav (role-aware), footer
+│   │   ├── login.html
+│   │   ├── dashboard.html
+│   │   ├── items.html
+│   │   ├── item_detail.html
+│   │   ├── owners.html
+│   │   ├── owner_detail.html
+│   │   ├── transfers.html
+│   │   ├── transfer_new.html
+│   │   └── users.html
+│   └── embed.go                 — go:embed directives for static/ and templates/
 ├── docs/
 │   └── plan.md                  — this document
 ├── Makefile
@@ -215,14 +243,104 @@ skladisce/
 | Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
 | Adjust for lost items          | Manager uses `/inventory/adjust` with negative delta + notes          |
 | Status change to `retired`     | Informational flag; doesn't block transfers (admin decision)          |
+| Expired JWT (browser)          | Cookie auth middleware redirects to `/login`; htmx sees 401 → redirect |
+| htmx vs full page              | Handlers check `HX-Request` header; return fragment or full page      |
 
 ## Auth Flow
+
+### JSON API (`/api/*`)
 
 1. **No open registration.** Only admins can create users via `POST /api/users`.
 2. First admin is seeded via CLI: `skladisce seed-admin` (prompts for
    username + password, creates an admin user directly in the DB).
-3. `POST /api/auth/login` → returns JWT with `{user_id, username, role, exp}`.
-4. All other endpoints require `Authorization: Bearer <token>`.
-5. **Admin-only:** user management (create, update, delete users).
-6. **Manager+:** item CRUD, owner CRUD, stock management, inventory adjustments.
-7. **All authenticated users:** view inventory, create transfers, view history.
+3. `POST /api/auth/login` → returns JWT as JSON `{"token": "…"}`.
+4. All other API endpoints require `Authorization: Bearer <token>` header.
+
+### Browser UI (`/*`)
+
+1. `GET /login` renders a login form.
+2. `POST /login` validates credentials, sets a `HttpOnly; Secure; SameSite=Strict`
+   cookie containing the JWT, and redirects to `/`.
+3. All subsequent page requests carry the cookie automatically.
+4. `POST /logout` clears the cookie and redirects to `/login`.
+5. Expired/missing cookie → redirect to `/login`.
+6. htmx requests that receive a 401 trigger a client-side redirect to `/login`
+   (via `HX-Trigger` response header or a small event listener).
+
+### Permission Summary
+
+| Action                                             | Role      |
+| -------------------------------------------------- | --------- |
+| Manage users (create, update, delete)              | admin     |
+| Manage items (create, edit, delete, image, status) | manager+  |
+| Manage owners (create, edit, delete)               | manager+  |
+| Manage stock (add stock, adjust quantities)        | manager+  |
+| Create transfers (borrow, return, handoff)         | all roles |
+| View inventory, history, details                   | all roles |
+
+## Frontend
+
+### Approach: Go Templates + htmx + `go:embed`
+
+The frontend is server-rendered using Go's `html/template` package. All
+templates, static assets (htmx, CSS), and any images are embedded into the
+binary via `go:embed`. No build toolchain, no npm, no bundler.
+
+**htmx** (~14 KB gzipped, vendored) handles dynamic interactions via HTML
+attributes — no custom JavaScript required. It supports all HTTP methods
+(`PUT`, `DELETE`) directly from HTML elements.
+
+### Routing: Two Layers
+
+The server exposes two sets of routes:
+
+1. **JSON API** (`/api/*`) — pure REST, returns JSON. For programmatic access,
+   scripts, or a future mobile app. Auth via `Authorization: Bearer <token>`.
+
+2. **Page routes** (`/*`) — render HTML via Go templates. For the browser UI.
+   Auth via JWT stored in an `HttpOnly` cookie (set on login). Page handlers
+   check the `HX-Request` header to decide what to return:
+   - **Normal request** → full page (layout + content).
+   - **htmx request** (`HX-Request: true`) → HTML fragment (just the changed
+     part of the page).
+
+Both layers share the same `store` package — no logic duplication.
+
+### Auth in the Browser
+
+- `GET /login` renders a login form.
+- `POST /login` validates credentials, sets an `HttpOnly` cookie with the JWT,
+  and redirects to the dashboard.
+- The cookie is sent automatically on every subsequent request.
+- Logout clears the cookie.
+- The JSON API continues to use `Authorization: Bearer` for non-browser clients.
+
+### Role-Based Rendering
+
+Templates receive the current user's role from the handler. Role checks are
+**server-side only** — the HTML for privileged actions (delete buttons, stock
+forms, user management links) is simply never rendered for unauthorized roles.
+There is nothing to bypass client-side.
+
+```html
+<!-- Example: only managers+ see the delete button -->
+{{if roleAtLeast .Role "manager"}}
+<button hx-delete="/owners/{{.Owner.ID}}" hx-target="closest tr" hx-swap="outerHTML">
+    Delete
+</button>
+{{end}}
+```
+
+### Pages
+
+| Page           | Route               | Roles     | Description                                 |
+| -------------- | ----------------    | --------- | ------------------------------------------- |
+| Login          | `GET /login`        | public    | Username + password form                    |
+| Dashboard      | `GET /`             | all       | Inventory overview, recent transfers        |
+| Items          | `GET /items`        | all       | List items; manager+ sees add/edit/delete   |
+| Item detail    | `GET /items/:id`    | all       | Distribution, history; manager+ sees edit   |
+| Owners         | `GET /owners`       | all       | List people/locations; manager+ sees CRUD   |
+| Owner detail   | `GET /owners/:id`   | all       | Inventory held; manager+ sees edit          |
+| Transfers      | `GET /transfers`    | all       | Transfer log with filters                   |
+| New transfer   | `GET /transfers/new`| all       | Form: pick item, from, to, quantity         |
+| Users          | `GET /users`        | admin     | User management                             |
