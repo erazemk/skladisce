@@ -298,8 +298,7 @@ skladisce/
 │   │   ├── transfer_new.html
 │   │   └── users.html
 │   └── embed.go                 — go:embed directives for static/ and templates/
-├── docs/
-│   └── plan.md                  — this document
+├── SPEC.md                      — this document (project specification)
 ├── AGENTS.md                    — agent instructions (build, test, conventions)
 ├── Makefile
 ├── go.mod
@@ -546,12 +545,12 @@ This ensures:
 
 ### Documentation as Source of Truth
 
-Agents should always read `docs/plan.md` before making architectural decisions.
-The plan documents:
+Agents should always read `SPEC.md` before making architectural decisions.
+The spec documents:
 - The database schema (authoritative — code must match).
 - API endpoints and their permission requirements.
 - Edge cases and business rules.
 - Frontend pages and routing.
 
-If the plan and code disagree, the plan wins. Update the plan first, then the
+If the spec and code disagree, the spec wins. Update the spec first, then the
 code.
