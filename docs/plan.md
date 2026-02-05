@@ -29,11 +29,13 @@ There is no separate borrow/return logic — it's all transfers.
 
 ```sql
 -- Authentication users (separate from owners — a person owner doesn't need a login)
+-- No email — users are identified by username + password only.
+-- Registration is disabled; only admins can create users via POST /api/users.
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY,
     username      TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at    DATETIME
 );
@@ -91,61 +93,72 @@ CREATE TABLE transfers (
 - **Soft delete** via `deleted_at` on users, owners, and items — preserves all
   history.
 
+## Roles & Permissions
+
+| Role      | Permissions                                                                  |
+| --------- | ---------------------------------------------------------------------------- |
+| `admin`   | Everything + manage users (create, update, delete)                           |
+| `manager` | Add/edit/delete items, manage stock & adjustments, manage owners + user perms |
+| `user`    | View inventory, create transfers (borrow/return/handoff), view history       |
+
+There is no open registration. Only admins can create new users. The first user
+is created via a CLI seed command (see Auth Flow below).
+
 ## API Endpoints
 
 ### Auth
 
 ```
-POST   /api/auth/register          — create account (admin-only after first user)
-POST   /api/auth/login             — get JWT token
+POST   /api/auth/login             — authenticate, get JWT token
 ```
 
 ### Users (admin only)
 
 ```
 GET    /api/users                  — list users
+POST   /api/users                  — create user (username + password + role)
 GET    /api/users/:id              — get user
-PUT    /api/users/:id              — update user role
+PUT    /api/users/:id              — update user (role, password reset)
 DELETE /api/users/:id              — soft delete user
 ```
 
-### Owners
+### Owners (manager+)
 
 ```
-GET    /api/owners                 — list (filter by ?type=person|location)
-POST   /api/owners                 — create person or location
-GET    /api/owners/:id             — get owner details
-PUT    /api/owners/:id             — update owner
-DELETE /api/owners/:id             — soft delete (fails if holding inventory)
-GET    /api/owners/:id/inventory   — what items this owner holds
+GET    /api/owners                 — list (filter by ?type=person|location)   [all roles]
+POST   /api/owners                 — create person or location                [manager+]
+GET    /api/owners/:id             — get owner details                        [all roles]
+PUT    /api/owners/:id             — update owner                             [manager+]
+DELETE /api/owners/:id             — soft delete (fails if holding inventory)  [manager+]
+GET    /api/owners/:id/inventory   — what items this owner holds              [all roles]
 ```
 
-### Items
+### Items (manager+ for writes)
 
 ```
-GET    /api/items                  — list (filter by ?status=active)
-POST   /api/items                  — create item type
-GET    /api/items/:id              — get item details + distribution
-PUT    /api/items/:id              — update item metadata/status
-DELETE /api/items/:id              — soft delete
-PUT    /api/items/:id/image        — upload image (multipart)
-GET    /api/items/:id/image        — serve image blob
-GET    /api/items/:id/history      — transfer history for this item
+GET    /api/items                  — list (filter by ?status=active)          [all roles]
+POST   /api/items                  — create item type                         [manager+]
+GET    /api/items/:id              — get item details + distribution          [all roles]
+PUT    /api/items/:id              — update item metadata/status              [manager+]
+DELETE /api/items/:id              — soft delete                              [manager+]
+PUT    /api/items/:id/image        — upload image (multipart)                 [manager+]
+GET    /api/items/:id/image        — serve image blob                         [all roles]
+GET    /api/items/:id/history      — transfer history for this item           [all roles]
 ```
 
-### Transfers (the core operation)
+### Transfers
 
 ```
-POST   /api/transfers              — move N of item X from owner A → owner B
-GET    /api/transfers              — list (filter by ?item_id, ?owner_id, ?from, ?to, ?since)
+POST   /api/transfers              — move N of item X from owner A → B        [all roles]
+GET    /api/transfers              — list (filter by ?item_id, ?owner_id, …)  [all roles]
 ```
 
 ### Inventory
 
 ```
-GET    /api/inventory              — full overview (all items × all holders)
-POST   /api/inventory/stock        — add initial stock (admin: creates quantity at a location)
-POST   /api/inventory/adjust       — adjust quantity (admin: correct errors, mark lost)
+GET    /api/inventory              — full overview (all items × all holders)   [all roles]
+POST   /api/inventory/stock        — add initial stock to a location           [manager+]
+POST   /api/inventory/adjust       — adjust quantity (correct errors, losses)  [manager+]
 ```
 
 ## Project Structure
@@ -158,7 +171,7 @@ skladisce/
 │   ├── api/
 │   │   ├── router.go            — route registration
 │   │   ├── middleware.go         — auth middleware, logging, CORS
-│   │   ├── auth.go              — login/register handlers
+│   │   ├── auth.go              — login handler
 │   │   ├── users.go             — user management handlers
 │   │   ├── owners.go            — owner CRUD handlers
 │   │   ├── items.go             — item CRUD + image handlers
@@ -197,17 +210,19 @@ skladisce/
 | Delete owner holding items     | Reject: must transfer all items away first                            |
 | Delete item with inventory     | Soft-delete only; inventory remains queryable for history             |
 | Concurrent transfers           | SQLite serialized transactions; `BEGIN IMMEDIATE` to avoid SQLITE_BUSY |
-| First user registration        | Auto-assign `admin` role; subsequent registrations require admin      |
+| First user registration        | No open registration; seed admin via CLI: `skladisce seed-admin`      |
 | Image upload                   | Validate MIME type (jpg/png/webp), enforce size limit (~5 MB)         |
 | Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
-| Adjust for lost items          | Admin uses `/inventory/adjust` with negative delta + notes            |
+| Adjust for lost items          | Manager uses `/inventory/adjust` with negative delta + notes          |
 | Status change to `retired`     | Informational flag; doesn't block transfers (admin decision)          |
 
 ## Auth Flow
 
-1. First user to register becomes admin.
-2. Admin creates additional users (or enables open registration).
-3. `POST /api/auth/login` → returns JWT with `{user_id, role, exp}`.
+1. **No open registration.** Only admins can create users via `POST /api/users`.
+2. First admin is seeded via CLI: `skladisce seed-admin` (prompts for
+   username + password, creates an admin user directly in the DB).
+3. `POST /api/auth/login` → returns JWT with `{user_id, username, role, exp}`.
 4. All other endpoints require `Authorization: Bearer <token>`.
-5. **Admin-only:** user management, stock adjustments, item/owner deletion.
-6. **Regular users:** create transfers, view inventory and history.
+5. **Admin-only:** user management (create, update, delete users).
+6. **Manager+:** item CRUD, owner CRUD, stock management, inventory adjustments.
+7. **All authenticated users:** view inventory, create transfers, view history.
