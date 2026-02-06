@@ -1,0 +1,786 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Skladišče API",
+    "description": "Inventory management API for tracking physical items and who holds them. All item movements are modeled as transfers between owners (people or locations).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development"
+    }
+  ],
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "summary": "Authenticate and get JWT token",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string", "description": "JWT token for use in Authorization header" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "put": {
+        "summary": "Change own password",
+        "description": "Requires current password. Available to all authenticated users.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["current_password", "new_password"],
+                "properties": {
+                  "current_password": { "type": "string" },
+                  "new_password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "List users",
+        "tags": ["Users"],
+        "description": "Admin only.",
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/User" } }
+              }
+            }
+          },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "post": {
+        "summary": "Create user",
+        "tags": ["Users"],
+        "description": "Admin only. No open registration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password", "role"],
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" },
+                  "role": { "type": "string", "enum": ["admin", "manager", "user"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get user",
+        "tags": ["Users"],
+        "description": "Admin only.",
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "summary": "Update user role",
+        "tags": ["Users"],
+        "description": "Admin only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": {
+                  "role": { "type": "string", "enum": ["admin", "manager", "user"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Soft delete user",
+        "tags": ["Users"],
+        "description": "Admin only. Cannot delete yourself.",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/users/{id}/password": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "put": {
+        "summary": "Reset user's password",
+        "tags": ["Users"],
+        "description": "Admin only. Sets a new password directly (no current password required).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password"],
+                "properties": {
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" }
+        }
+      }
+    },
+    "/api/owners": {
+      "get": {
+        "summary": "List owners",
+        "tags": ["Owners"],
+        "description": "All roles. Optionally filter by type.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["person", "location"] },
+            "description": "Filter by owner type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of owners",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Owner" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create owner",
+        "tags": ["Owners"],
+        "description": "Manager+ only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string", "enum": ["person", "location"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Owner created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Owner" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/owners/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get owner details",
+        "tags": ["Owners"],
+        "description": "All roles.",
+        "responses": {
+          "200": {
+            "description": "Owner details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Owner" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "summary": "Update owner",
+        "tags": ["Owners"],
+        "description": "Manager+ only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated owner",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Owner" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Soft delete owner",
+        "tags": ["Owners"],
+        "description": "Manager+ only. Fails if the owner still holds inventory.",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/owners/{id}/inventory": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get owner's inventory",
+        "tags": ["Owners"],
+        "description": "All roles. Returns what items this owner currently holds.",
+        "responses": {
+          "200": {
+            "description": "Inventory entries for this owner",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Inventory" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items": {
+      "get": {
+        "summary": "List items",
+        "tags": ["Items"],
+        "description": "All roles. Optionally filter by status.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["active", "damaged", "lost", "removed"] },
+            "description": "Filter by item status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of items",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create item",
+        "tags": ["Items"],
+        "description": "Manager+ only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Item" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{id}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get item details with distribution",
+        "tags": ["Items"],
+        "description": "All roles. Returns item metadata and current inventory distribution.",
+        "responses": {
+          "200": {
+            "description": "Item details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": { "$ref": "#/components/schemas/Item" },
+                    "distribution": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Inventory" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "summary": "Update item",
+        "tags": ["Items"],
+        "description": "Manager+ only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "status": { "type": "string", "enum": ["active", "damaged", "lost", "removed"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated item",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Item" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Soft delete item",
+        "tags": ["Items"],
+        "description": "Manager+ only.",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" }
+        }
+      }
+    },
+    "/api/items/{id}/image": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get item image",
+        "tags": ["Items"],
+        "description": "All roles. Returns the image binary with appropriate Content-Type.",
+        "responses": {
+          "200": {
+            "description": "Image data",
+            "content": {
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } },
+              "image/png": { "schema": { "type": "string", "format": "binary" } },
+              "image/webp": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "summary": "Upload item image",
+        "tags": ["Items"],
+        "description": "Manager+ only. Max 5 MB. Accepts JPEG, PNG, or WebP.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/items/{id}/history": {
+      "parameters": [
+        { "$ref": "#/components/parameters/ID" }
+      ],
+      "get": {
+        "summary": "Get item transfer history",
+        "tags": ["Items"],
+        "description": "All roles.",
+        "responses": {
+          "200": {
+            "description": "Transfer history for this item",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Transfer" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transfers": {
+      "get": {
+        "summary": "List transfers",
+        "tags": ["Transfers"],
+        "description": "All roles. Optionally filter by item or owner.",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "Filter by item ID"
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "Filter by owner ID (matches from or to)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of transfers",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Transfer" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create transfer",
+        "tags": ["Transfers"],
+        "description": "All roles. Moves a quantity of an item from one owner to another. Fails if source doesn't hold enough or if from_owner_id equals to_owner_id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["item_id", "from_owner_id", "to_owner_id", "quantity"],
+                "properties": {
+                  "item_id": { "type": "integer", "description": "ID of the item to transfer" },
+                  "from_owner_id": { "type": "integer", "description": "Source owner ID" },
+                  "to_owner_id": { "type": "integer", "description": "Destination owner ID" },
+                  "quantity": { "type": "integer", "minimum": 1, "description": "Number of items to transfer" },
+                  "notes": { "type": "string", "description": "Optional notes about the transfer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transfer created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Transfer" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/inventory": {
+      "get": {
+        "summary": "Full inventory overview",
+        "tags": ["Inventory"],
+        "description": "All roles. Returns all item × owner quantity entries.",
+        "responses": {
+          "200": {
+            "description": "Full inventory",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Inventory" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/stock": {
+      "post": {
+        "summary": "Add stock",
+        "tags": ["Inventory"],
+        "description": "Manager+ only. Adds initial stock of an item to any owner.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["item_id", "owner_id", "quantity"],
+                "properties": {
+                  "item_id": { "type": "integer" },
+                  "owner_id": { "type": "integer" },
+                  "quantity": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/inventory/adjust": {
+      "post": {
+        "summary": "Adjust inventory",
+        "tags": ["Inventory"],
+        "description": "Manager+ only. Adjust quantity for corrections or losses. Delta can be negative.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["item_id", "owner_id", "delta"],
+                "properties": {
+                  "item_id": { "type": "integer" },
+                  "owner_id": { "type": "integer" },
+                  "delta": { "type": "integer", "description": "Positive to add, negative to remove. Must not be zero." },
+                  "notes": { "type": "string", "description": "Reason for adjustment" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Message" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Get a token from POST /api/auth/login, then pass it as: Authorization: Bearer <token>"
+      }
+    },
+    "parameters": {
+      "ID": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer" }
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "manager", "user"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "deleted_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "Owner": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["person", "location"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "deleted_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "image_mime": { "type": "string", "description": "MIME type of the stored image, if any" },
+          "status": { "type": "string", "enum": ["active", "damaged", "lost", "removed"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "deleted_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "Transfer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "item_id": { "type": "integer" },
+          "from_owner_id": { "type": "integer" },
+          "to_owner_id": { "type": "integer" },
+          "quantity": { "type": "integer" },
+          "notes": { "type": "string" },
+          "transferred_at": { "type": "string", "format": "date-time" },
+          "transferred_by": { "type": "integer", "nullable": true, "description": "User ID who performed the transfer" },
+          "item_name": { "type": "string", "description": "Joined item name" },
+          "from_owner_name": { "type": "string", "description": "Joined source owner name" },
+          "to_owner_name": { "type": "string", "description": "Joined destination owner name" }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": "integer" },
+          "owner_id": { "type": "integer" },
+          "quantity": { "type": "integer" },
+          "item_name": { "type": "string", "description": "Joined item name" },
+          "owner_name": { "type": "string", "description": "Joined owner name" },
+          "owner_type": { "type": "string", "enum": ["person", "location"], "description": "Joined owner type" }
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": { "type": "string", "description": "Error message" }
+              }
+            }
+          }
+        }
+      },
+      "Message": {
+        "description": "Success message",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

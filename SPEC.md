@@ -311,6 +311,8 @@ skladisce/
 │   └── embed.go                 — go:embed directives for static/ and templates/
 ├── SPEC.md                      — this document (project specification)
 ├── AGENTS.md                    — agent instructions (build, test, conventions)
+├── INTEGRATION.md               — guide for external developers/integrators
+├── openapi.json                 — OpenAPI 3.1 spec (public API contract)
 ├── Makefile
 ├── go.mod
 └── README.md

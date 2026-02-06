@@ -73,5 +73,10 @@ or a functional decision is made, `SPEC.md` must be updated in the same commit
 - New or changed frontend pages, routes, or UI behavior
 - Changes to the project structure (new files/packages)
 
+**API spec rule:** Any change to API endpoints (new endpoints, changed
+request/response schemas, changed parameters, changed auth requirements) must
+also update `openapi.json`. This file is the public API contract used by
+external integrators and their AI agents.
+
 The spec is the single source of truth. Code without a matching spec entry is
 undocumented behavior that may be removed.
