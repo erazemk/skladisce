@@ -41,21 +41,21 @@ func (s *Server) ItemDetailPage(w http.ResponseWriter, r *http.Request) {
 
 	dist, _ := store.GetItemDistribution(r.Context(), s.DB, id)
 	history, _ := store.GetItemHistory(r.Context(), s.DB, id)
-	locations, _ := store.ListOwners(r.Context(), s.DB, model.OwnerTypeLocation)
+	owners, _ := store.ListOwners(r.Context(), s.DB, "")
 
 	s.Templates.Render(w, "item_detail.html", &struct {
 		PageData
 		Item         *model.Item
 		Distribution []model.Inventory
 		History      []model.Transfer
-		Locations    []model.Owner
+		Owners       []model.Owner
 		CreatedAt    any
 	}{
 		PageData:     PageData{Title: item.Name, User: claims, Token: GetWebToken(r.Context())},
 		Item:         item,
 		Distribution: dist,
 		History:      history,
-		Locations:    locations,
+		Owners:       owners,
 		CreatedAt:    item.CreatedAt,
 	})
 }

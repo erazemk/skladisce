@@ -34,7 +34,7 @@ func ListInventory(ctx context.Context, db *sql.DB) ([]model.Inventory, error) {
 	return items, rows.Err()
 }
 
-// AddStock adds initial stock of an item to a location owner.
+// AddStock adds initial stock of an item to an owner (any type).
 func AddStock(ctx context.Context, db *sql.DB, itemID, ownerID int64, quantity int, userID *int64) error {
 	if quantity <= 0 {
 		return fmt.Errorf("quantity must be positive")
@@ -46,7 +46,7 @@ func AddStock(ctx context.Context, db *sql.DB, itemID, ownerID int64, quantity i
 	}
 	defer tx.Rollback()
 
-	// Verify the owner is a location.
+	// Verify the owner exists.
 	var ownerType string
 	err = tx.QueryRowContext(ctx,
 		`SELECT type FROM owners WHERE id = ? AND deleted_at IS NULL`, ownerID,
@@ -56,9 +56,6 @@ func AddStock(ctx context.Context, db *sql.DB, itemID, ownerID int64, quantity i
 	}
 	if err != nil {
 		return fmt.Errorf("checking owner: %w", err)
-	}
-	if ownerType != model.OwnerTypeLocation {
-		return fmt.Errorf("stock can only be added to locations")
 	}
 
 	// Upsert inventory.

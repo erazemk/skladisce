@@ -179,6 +179,11 @@ Server listening on :8080
 - DB file missing → runs init (create DB + schema + admin), then starts server.
 - DB file exists → auto-migrates schema if needed, then starts server.
 - Serves both the JSON API (`/api/*`) and the web UI (`/*`).
+- Graceful shutdown on SIGINT/SIGTERM: stops accepting new connections, waits up
+  to 5 seconds for in-flight requests to complete, then closes the database
+  connection cleanly.
+- Request logging: every request logs method, URI, status code, and duration
+  (e.g., `POST /items 303 1ms`).
 
 ## API Endpoints
 
@@ -235,7 +240,7 @@ GET    /api/transfers              — list (filter by ?item_id, ?owner_id, …)
 
 ```
 GET    /api/inventory              — full overview (all items × all holders)   [all roles]
-POST   /api/inventory/stock        — add initial stock to a location           [manager+]
+POST   /api/inventory/stock        — add initial stock to any owner            [manager+]
 POST   /api/inventory/adjust       — adjust quantity (correct errors, losses)  [manager+]
 ```
 
@@ -296,7 +301,8 @@ skladisce/
 │   │   ├── owner_detail.html
 │   │   ├── transfers.html
 │   │   ├── transfer_new.html
-│   │   └── users.html
+│   │   ├── users.html
+│   │   └── settings.html
 │   └── embed.go                 — go:embed directives for static/ and templates/
 ├── SPEC.md                      — this document (project specification)
 ├── AGENTS.md                    — agent instructions (build, test, conventions)
@@ -320,10 +326,12 @@ skladisce/
 | Image upload                   | Validate MIME type (jpg/png/webp), enforce size limit (~5 MB)         |
 | Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
 | Adjust for lost items          | Manager uses `/inventory/adjust` with negative delta + notes          |
+| Add stock to any owner         | `/inventory/stock` works for both locations and people (for pre-existing holdings) |
 | Status change to `retired`     | Informational flag; doesn't block transfers (admin decision)          |
 | Password change (self)         | `PUT /api/auth/password` requires current password                    |
 | Password reset (admin)         | `PUT /api/users/:id/password` admin sets new password directly        |
 | htmx vs full page              | Handlers check `HX-Request` header; return fragment or full page      |
+| Server shutdown (Ctrl+C)       | Graceful: finish in-flight requests (5s timeout), close DB cleanly    |
 
 ## Auth Flow
 
@@ -514,7 +522,7 @@ build:
 	CGO_ENABLED=0 go build -o skladisce ./cmd/server
 
 test:
-	go test ./...
+	go test -timeout 10s ./...
 
 lint:
 	go vet ./...

@@ -10,6 +10,9 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -127,10 +130,33 @@ func cmdServe(args []string) {
 
 	handler := api.LoggingMiddleware(mux)
 
+	server := &http.Server{
+		Addr:    *addr,
+		Handler: handler,
+	}
+
+	// Graceful shutdown on SIGINT/SIGTERM.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-quit
+		log.Println("Shutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Server forced to shutdown: %v", err)
+		}
+	}()
+
 	fmt.Printf("Server listening on %s\n", *addr)
-	if err := http.ListenAndServe(*addr, handler); err != nil {
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
+
+	log.Println("Server stopped, closing database...")
 }
 
 // initDatabase creates a new database, runs migrations, and creates the admin user.

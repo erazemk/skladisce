@@ -26,7 +26,7 @@ func TestAddStockAndListInventory(t *testing.T) {
 	}
 }
 
-func TestAddStockToPersonFails(t *testing.T) {
+func TestAddStockToPersonWorks(t *testing.T) {
 	database := db.NewTestDB(t)
 	ctx := context.Background()
 
@@ -34,8 +34,13 @@ func TestAddStockToPersonFails(t *testing.T) {
 	person, _ := CreateOwner(ctx, database, "Alice", model.OwnerTypePerson)
 
 	err := AddStock(ctx, database, item.ID, person.ID, 10, nil)
-	if err == nil {
-		t.Error("expected error adding stock to person")
+	if err != nil {
+		t.Errorf("expected stock addition to person to succeed, got: %v", err)
+	}
+
+	inv, _ := GetOwnerInventory(ctx, database, person.ID)
+	if len(inv) != 1 || inv[0].Quantity != 10 {
+		t.Errorf("expected person to have 10, got %v", inv)
 	}
 }
 

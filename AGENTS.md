@@ -7,7 +7,7 @@ for the full specification.
 
 ```
 make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
-make test           — go test ./...
+make test           — go test -timeout 10s ./...
 make lint           — go vet ./...
 make run            — build + run serve with default flags
 make clean          — remove binary
@@ -65,3 +65,15 @@ Both API and web layers share the same `store` package — no logic duplication.
 
 Read `SPEC.md` before making architectural decisions. If spec and code disagree,
 the spec wins. Update the spec first, then the code.
+
+**Spec-update rule:** Any time a new requirement is added, a behavior changes,
+or a functional decision is made, `SPEC.md` must be updated in the same commit
+(or before the code change). This includes:
+- New or changed API endpoints, parameters, or responses
+- New or changed business rules and edge cases
+- New or changed CLI flags or behavior
+- New or changed frontend pages, routes, or UI behavior
+- Changes to the project structure (new files/packages)
+
+The spec is the single source of truth. Code without a matching spec entry is
+undocumented behavior that may be removed.

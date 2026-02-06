@@ -91,11 +91,11 @@
     <form method="POST" action="/items/{{.Item.ID}}/stock">
         <div class="grid-2">
             <div class="form-group">
-                <label for="owner_id">Lokacija</label>
+                <label for="owner_id">Lastnik</label>
                 <select id="owner_id" name="owner_id" required>
-                    <option value="">Izberi lokacijo</option>
-                    {{range .Locations}}
-                    <option value="{{.ID}}">{{.Name}}</option>
+                    <option value="">Izberi lastnika</option>
+                    {{range .Owners}}
+                    <option value="{{.ID}}">{{.Name}} ({{if eq .Type "person"}}oseba{{else}}lokacija{{end}})</option>
                     {{end}}
                 </select>
             </div>
