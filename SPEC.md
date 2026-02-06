@@ -139,11 +139,12 @@ The admin can change it after logging in.
 
 **Flags:**
 - `--db <path>` — path to the SQLite database file (default: `skladisce.sqlite3`)
+- `--admin <username>` — admin account username (default: `admin`)
 
 **Behavior:**
 - Fails if the database file already exists (no accidental overwrites).
 - Generates a 16-character random password (mixed case, digits, symbols).
-- Username is always `admin` for the initial account.
+- Username defaults to `admin` but can be overridden with `--admin`.
 
 ### `skladisce serve`
 
@@ -174,6 +175,8 @@ Server listening on :8080
 - `--addr <host:port>` — listen address (default: `:8080`)
 - `--jwt-secret <secret>` — JWT signing key (default: auto-generated on startup;
   note: auto-generated secrets invalidate all tokens on restart)
+- `--admin <username>` — admin account username, used only when auto-initializing
+  a new database (default: `admin`)
 
 **Behavior:**
 - DB file missing → runs init (create DB + schema + admin), then starts server.

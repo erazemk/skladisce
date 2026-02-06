@@ -42,6 +42,7 @@ func main() {
 func cmdInit(args []string) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	dbPath := fs.String("db", "skladisce.sqlite3", "path to SQLite database file")
+	adminUser := fs.String("admin", "admin", "admin account username")
 	fs.Parse(args)
 
 	if _, err := os.Stat(*dbPath); err == nil {
@@ -49,22 +50,14 @@ func cmdInit(args []string) {
 		os.Exit(1)
 	}
 
-	database, password, err := initDatabase(*dbPath)
+	database, password, err := initDatabase(*dbPath, *adminUser)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 	database.Close()
 
-	fmt.Printf("Database created: %s\n", *dbPath)
-	fmt.Println("Schema initialized.")
-	fmt.Println()
-	fmt.Println("Admin account created:")
-	fmt.Printf("  Username: admin\n")
-	fmt.Printf("  Password: %s\n", password)
-	fmt.Println()
-	fmt.Println("Save this password — it cannot be recovered.")
-	fmt.Println("The admin can change it after logging in.")
+	printInitResult(*dbPath, *adminUser, password)
 }
 
 func cmdServe(args []string) {
@@ -72,6 +65,7 @@ func cmdServe(args []string) {
 	dbPath := fs.String("db", "skladisce.sqlite3", "path to SQLite database file")
 	addr := fs.String("addr", ":8080", "listen address")
 	jwtSecret := fs.String("jwt-secret", "", "JWT signing key (auto-generated if empty)")
+	adminUser := fs.String("admin", "admin", "admin account username (used if DB is auto-initialized)")
 	fs.Parse(args)
 
 	// Auto-generate JWT secret if not provided.
@@ -86,21 +80,13 @@ func cmdServe(args []string) {
 
 	// Check if DB exists, auto-init if not.
 	if _, err := os.Stat(*dbPath); os.IsNotExist(err) {
-		database, password, err := initDatabase(*dbPath)
+		database, password, err := initDatabase(*dbPath, *adminUser)
 		if err != nil {
 			log.Fatalf("Failed to initialize database: %v", err)
 		}
 		database.Close()
 
-		fmt.Printf("Database created: %s\n", *dbPath)
-		fmt.Println("Schema initialized.")
-		fmt.Println()
-		fmt.Println("Admin account created:")
-		fmt.Printf("  Username: admin\n")
-		fmt.Printf("  Password: %s\n", password)
-		fmt.Println()
-		fmt.Println("Save this password — it cannot be recovered.")
-		fmt.Println("The admin can change it after logging in.")
+		printInitResult(*dbPath, *adminUser, password)
 		fmt.Println()
 	}
 
@@ -160,7 +146,7 @@ func cmdServe(args []string) {
 }
 
 // initDatabase creates a new database, runs migrations, and creates the admin user.
-func initDatabase(path string) (*sql.DB, string, error) {
+func initDatabase(path, adminUsername string) (*sql.DB, string, error) {
 	database, err := db.Open(path)
 	if err != nil {
 		return nil, "", fmt.Errorf("opening database: %w", err)
@@ -187,7 +173,7 @@ func initDatabase(path string) (*sql.DB, string, error) {
 	}
 
 	ctx := context.Background()
-	_, err = store.CreateUser(ctx, database, "admin", string(hash), "admin")
+	_, err = store.CreateUser(ctx, database, adminUsername, string(hash), "admin")
 	if err != nil {
 		database.Close()
 		os.Remove(path)
@@ -195,6 +181,19 @@ func initDatabase(path string) (*sql.DB, string, error) {
 	}
 
 	return database, password, nil
+}
+
+// printInitResult prints the database initialization result to stdout.
+func printInitResult(dbPath, username, password string) {
+	fmt.Printf("Database created: %s\n", dbPath)
+	fmt.Println("Schema initialized.")
+	fmt.Println()
+	fmt.Println("Admin account created:")
+	fmt.Printf("  Username: %s\n", username)
+	fmt.Printf("  Password: %s\n", password)
+	fmt.Println()
+	fmt.Println("Save this password — it cannot be recovered.")
+	fmt.Println("The admin can change it after logging in.")
 }
 
 // generatePassword creates a random password of the given length.
