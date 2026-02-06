@@ -186,8 +186,9 @@ Server listening on :8080
   to 5 seconds for in-flight requests to complete, then closes the database
   connection cleanly.
 - Request logging: structured via `slog` with fields `method`, `path`, `status`,
-  `duration`. Logs at INFO for success, WARN for 4xx, ERROR for 5xx.
-  All logs are written to both stdout and `skladisce.log` (append mode).
+  `duration`. Log level varies by status: INFO for 2xx/3xx, WARN for 4xx,
+  ERROR for 5xx. INFO/WARN go to stdout, ERROR goes to stderr (gokrazy
+  compatible — no log files).
 
 ## API Endpoints
 

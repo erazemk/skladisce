@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -23,7 +22,45 @@ import (
 	"github.com/erazemk/skladisce/internal/web"
 )
 
-const logFile = "skladisce.log"
+// levelRouter is a slog.Handler that routes INFO/WARN to stdout and ERROR+ to stderr.
+type levelRouter struct {
+	stdout slog.Handler
+	stderr slog.Handler
+}
+
+func (lr *levelRouter) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelInfo
+}
+
+func (lr *levelRouter) Handle(ctx context.Context, r slog.Record) error {
+	if r.Level >= slog.LevelError {
+		return lr.stderr.Handle(ctx, r)
+	}
+	return lr.stdout.Handle(ctx, r)
+}
+
+func (lr *levelRouter) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &levelRouter{
+		stdout: lr.stdout.WithAttrs(attrs),
+		stderr: lr.stderr.WithAttrs(attrs),
+	}
+}
+
+func (lr *levelRouter) WithGroup(name string) slog.Handler {
+	return &levelRouter{
+		stdout: lr.stdout.WithGroup(name),
+		stderr: lr.stderr.WithGroup(name),
+	}
+}
+
+func setupLogger() {
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+	handler := &levelRouter{
+		stdout: slog.NewTextHandler(os.Stdout, opts),
+		stderr: slog.NewTextHandler(os.Stderr, opts),
+	}
+	slog.SetDefault(slog.New(handler))
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -40,20 +77,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: skladisce <init|serve>\n", os.Args[1])
 		os.Exit(1)
 	}
-}
-
-// setupLogger configures slog to write to both stdout and the log file.
-func setupLogger() (*os.File, error) {
-	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("opening log file: %w", err)
-	}
-
-	w := io.MultiWriter(os.Stdout, f)
-	handler := slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})
-	slog.SetDefault(slog.New(handler))
-
-	return f, nil
 }
 
 func cmdInit(args []string) {
@@ -85,13 +108,8 @@ func cmdServe(args []string) {
 	adminUser := fs.String("admin", "admin", "admin account username (used if DB is auto-initialized)")
 	fs.Parse(args)
 
-	// Set up structured logging to stdout + file.
-	logf, err := setupLogger()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	defer logf.Close()
+	// Set up structured logging: INFO/WARN → stdout, ERROR → stderr.
+	setupLogger()
 
 	// Auto-generate JWT secret if not provided.
 	if *jwtSecret == "" {
