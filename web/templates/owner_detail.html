@@ -1,0 +1,48 @@
+{{define "content"}}
+<div class="flex-between mb-2">
+    <h1>{{.Owner.Name}} <span class="badge badge-{{.Owner.Type}}">{{if eq .Owner.Type "person"}}Oseba{{else}}Lokacija{{end}}</span></h1>
+    {{if roleAtLeast .User.Role "manager"}}
+    <div class="flex gap-1">
+        <button class="btn btn-secondary" onclick="document.getElementById('edit-form').style.display=document.getElementById('edit-form').style.display==='none'?'block':'none'">Uredi</button>
+        <button class="btn btn-danger" hx-delete="/api/owners/{{.Owner.ID}}" hx-headers='{"Authorization": "Bearer {{.Token}}"}' hx-confirm="Ali ste prepričani?" hx-on::after-request="if(event.detail.successful) window.location.href='/owners'">Izbriši</button>
+    </div>
+    {{end}}
+</div>
+
+{{if roleAtLeast .User.Role "manager"}}
+<div id="edit-form" class="card" style="display:none">
+    <h2>Uredi lastnika</h2>
+    <form method="POST" action="/owners/{{.Owner.ID}}">
+        <div class="form-group">
+            <label for="name">Ime</label>
+            <input type="text" id="name" name="name" value="{{.Owner.Name}}" required>
+        </div>
+        <div class="flex gap-1">
+            <button type="submit" class="btn btn-primary">Shrani</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-form').style.display='none'">Prekliči</button>
+        </div>
+    </form>
+</div>
+{{end}}
+
+<div class="card">
+    <h2>Inventar</h2>
+    {{if .Inventory}}
+    <table>
+        <thead>
+            <tr><th>Predmet</th><th>Količina</th></tr>
+        </thead>
+        <tbody>
+            {{range .Inventory}}
+            <tr>
+                <td><a href="/items/{{.ItemID}}">{{.ItemName}}</a></td>
+                <td>{{.Quantity}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p style="color: var(--text-muted)">Ta lastnik nima inventarja.</p>
+    {{end}}
+</div>
+{{end}}

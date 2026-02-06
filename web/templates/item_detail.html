@@ -1,0 +1,135 @@
+{{define "content"}}
+<div class="flex-between mb-2">
+    <h1>{{.Item.Name}}</h1>
+    {{if roleAtLeast .User.Role "manager"}}
+    <div class="flex gap-1">
+        <button class="btn btn-secondary" onclick="document.getElementById('edit-form').style.display=document.getElementById('edit-form').style.display==='none'?'block':'none'">Uredi</button>
+        <button class="btn btn-danger" hx-delete="/api/items/{{.Item.ID}}" hx-headers='{"Authorization": "Bearer {{.Token}}"}' hx-confirm="Ali ste prepričani?" hx-on::after-request="if(event.detail.successful) window.location.href='/items'">Izbriši</button>
+    </div>
+    {{end}}
+</div>
+
+{{if roleAtLeast .User.Role "manager"}}
+<div id="edit-form" class="card" style="display:none">
+    <h2>Uredi predmet</h2>
+    <form method="POST" action="/items/{{.Item.ID}}">
+        <div class="form-group">
+            <label for="name">Ime</label>
+            <input type="text" id="name" name="name" value="{{.Item.Name}}" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Opis</label>
+            <textarea id="description" name="description">{{.Item.Description}}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="status">Stanje</label>
+            <select id="status" name="status">
+                <option value="active" {{if eq .Item.Status "active"}}selected{{end}}>Aktiven</option>
+                <option value="damaged" {{if eq .Item.Status "damaged"}}selected{{end}}>Poškodovan</option>
+                <option value="retired" {{if eq .Item.Status "retired"}}selected{{end}}>Umaknjen</option>
+            </select>
+        </div>
+        <div class="flex gap-1">
+            <button type="submit" class="btn btn-primary">Shrani</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-form').style.display='none'">Prekliči</button>
+        </div>
+    </form>
+</div>
+{{end}}
+
+<div class="card mb-2">
+    <p><strong>Opis:</strong> {{if .Item.Description}}{{.Item.Description}}{{else}}<em>Ni opisa.</em>{{end}}</p>
+    <p><strong>Stanje:</strong> <span class="badge badge-{{.Item.Status}}">{{.Item.Status}}</span></p>
+    <p><strong>Ustvarjeno:</strong> {{.Item.CreatedAt.Format "02.01.2006 15:04"}}</p>
+</div>
+
+{{if roleAtLeast .User.Role "manager"}}
+<div class="card mb-2">
+    <h2>Slika</h2>
+    {{if .Item.ImageMime}}
+    <p><img src="/api/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
+    {{end}}
+    <form method="POST" action="/items/{{.Item.ID}}/image" enctype="multipart/form-data" class="mt-1">
+        <div class="form-group">
+            <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">Naloži sliko</button>
+    </form>
+</div>
+{{else if .Item.ImageMime}}
+<div class="card mb-2">
+    <h2>Slika</h2>
+    <p><img src="/api/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
+</div>
+{{end}}
+
+<div class="card mb-2">
+    <h2>Razporeditev</h2>
+    {{if .Distribution}}
+    <table>
+        <thead>
+            <tr><th>Lastnik</th><th>Tip</th><th>Količina</th></tr>
+        </thead>
+        <tbody>
+            {{range .Distribution}}
+            <tr>
+                <td><a href="/owners/{{.OwnerID}}">{{.OwnerName}}</a></td>
+                <td><span class="badge badge-{{.OwnerType}}">{{if eq .OwnerType "person"}}Oseba{{else}}Lokacija{{end}}</span></td>
+                <td>{{.Quantity}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p style="color: var(--text-muted)">Ni zalog.</p>
+    {{end}}
+</div>
+
+{{if roleAtLeast .User.Role "manager"}}
+<div class="card mb-2">
+    <h2>Dodaj zalogo</h2>
+    <form method="POST" action="/items/{{.Item.ID}}/stock">
+        <div class="grid-2">
+            <div class="form-group">
+                <label for="owner_id">Lokacija</label>
+                <select id="owner_id" name="owner_id" required>
+                    <option value="">Izberi lokacijo</option>
+                    {{range .Locations}}
+                    <option value="{{.ID}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quantity">Količina</label>
+                <input type="number" id="quantity" name="quantity" min="1" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Dodaj zalogo</button>
+    </form>
+</div>
+{{end}}
+
+<div class="card">
+    <h2>Zgodovina prenosov</h2>
+    {{if .History}}
+    <table>
+        <thead>
+            <tr><th>Datum</th><th>Od</th><th>Do</th><th>Količina</th><th>Opombe</th></tr>
+        </thead>
+        <tbody>
+            {{range .History}}
+            <tr>
+                <td>{{.TransferredAt.Format "02.01.2006 15:04"}}</td>
+                <td>{{.FromOwnerName}}</td>
+                <td>{{.ToOwnerName}}</td>
+                <td>{{.Quantity}}</td>
+                <td>{{.Notes}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p style="color: var(--text-muted)">Ni prenosov.</p>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="login-container">
+    <div class="card">
+        <h1>Prijava</h1>
+        {{if .Error}}
+        <div class="alert alert-error">{{.Error}}</div>
+        {{end}}
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label for="username">Uporabniško ime</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Geslo</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%">Prijava</button>
+        </form>
+    </div>
+</div>
+{{end}}

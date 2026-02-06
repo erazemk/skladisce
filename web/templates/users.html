@@ -1,0 +1,58 @@
+{{define "content"}}
+<h1>Uporabniki</h1>
+
+<div class="flex-between mb-2">
+    <div></div>
+    <button class="btn btn-primary" onclick="document.getElementById('add-form').style.display='block'">Dodaj uporabnika</button>
+</div>
+
+<div id="add-form" class="card" style="display:none">
+    <h2>Nov uporabnik</h2>
+    <form method="POST" action="/users">
+        <div class="grid-2">
+            <div class="form-group">
+                <label for="username">Uporabniško ime</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Geslo</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="role">Vloga</label>
+            <select id="role" name="role" required>
+                <option value="user">Uporabnik</option>
+                <option value="manager">Upravljalec</option>
+                <option value="admin">Administrator</option>
+            </select>
+        </div>
+        <div class="flex gap-1">
+            <button type="submit" class="btn btn-primary">Shrani</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('add-form').style.display='none'">Prekliči</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>Uporabniško ime</th><th>Vloga</th><th>Ustvarjeno</th><th></th></tr>
+        </thead>
+        <tbody>
+            {{range .Users}}
+            <tr>
+                <td>{{.Username}}</td>
+                <td><span class="badge badge-{{.Role}}">{{.Role}}</span></td>
+                <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani?" hx-target="closest tr" hx-swap="outerHTML">Izbriši</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" style="color: var(--text-muted)">Ni uporabnikov.</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

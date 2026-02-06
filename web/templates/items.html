@@ -1,0 +1,53 @@
+{{define "content"}}
+<div class="flex-between mb-2">
+    <h1>Predmeti</h1>
+    {{if roleAtLeast .User.Role "manager"}}
+    <button class="btn btn-primary" onclick="document.getElementById('add-form').style.display='block'">Dodaj predmet</button>
+    {{end}}
+</div>
+
+{{if roleAtLeast .User.Role "manager"}}
+<div id="add-form" class="card" style="display:none">
+    <h2>Nov predmet</h2>
+    <form hx-post="/api/items" hx-headers='{"Authorization": "Bearer {{.Token}}"}' hx-target="#items-table" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { this.reset(); document.getElementById('add-form').style.display='none'; window.location.reload(); }">
+        <div class="form-group">
+            <label for="name">Ime</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Opis</label>
+            <textarea id="description" name="description"></textarea>
+        </div>
+        <div class="flex gap-1">
+            <button type="submit" class="btn btn-primary">Shrani</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('add-form').style.display='none'">Prekliči</button>
+        </div>
+    </form>
+</div>
+{{end}}
+
+<div class="card">
+    <table id="items-table">
+        <thead>
+            <tr><th>Ime</th><th>Opis</th><th>Stanje</th><th>Ustvarjeno</th>{{if roleAtLeast .User.Role "manager"}}<th></th>{{end}}</tr>
+        </thead>
+        <tbody>
+            {{range .Items}}
+            <tr>
+                <td><a href="/items/{{.ID}}">{{.Name}}</a></td>
+                <td>{{.Description}}</td>
+                <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+                <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                {{if roleAtLeast $.User.Role "manager"}}
+                <td>
+                    <a href="/items/{{.ID}}" class="btn btn-secondary btn-sm">Uredi</a>
+                </td>
+                {{end}}
+            </tr>
+            {{else}}
+            <tr><td colspan="5" style="color: var(--text-muted)">Ni predmetov.</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

@@ -1,0 +1,51 @@
+{{define "content"}}
+<h1>Nadzorna plošča</h1>
+
+<div class="grid-2">
+    <div class="card">
+        <h2>Inventar</h2>
+        {{if .Inventory}}
+        <table>
+            <thead>
+                <tr><th>Predmet</th><th>Lastnik</th><th>Tip</th><th>Količina</th></tr>
+            </thead>
+            <tbody>
+                {{range .Inventory}}
+                <tr>
+                    <td><a href="/items/{{.ItemID}}">{{.ItemName}}</a></td>
+                    <td><a href="/owners/{{.OwnerID}}">{{.OwnerName}}</a></td>
+                    <td><span class="badge badge-{{.OwnerType}}">{{if eq .OwnerType "person"}}Oseba{{else}}Lokacija{{end}}</span></td>
+                    <td>{{.Quantity}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p style="color: var(--text-muted)">Ni inventarja.</p>
+        {{end}}
+    </div>
+
+    <div class="card">
+        <h2>Zadnji prenosi</h2>
+        {{if .RecentTransfers}}
+        <table>
+            <thead>
+                <tr><th>Predmet</th><th>Od</th><th>Do</th><th>Kol.</th></tr>
+            </thead>
+            <tbody>
+                {{range .RecentTransfers}}
+                <tr>
+                    <td>{{.ItemName}}</td>
+                    <td>{{.FromOwnerName}}</td>
+                    <td>{{.ToOwnerName}}</td>
+                    <td>{{.Quantity}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p style="color: var(--text-muted)">Ni prenosov.</p>
+        {{end}}
+    </div>
+</div>
+{{end}}

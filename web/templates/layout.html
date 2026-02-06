@@ -1,0 +1,47 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skladišče{{if .Title}} — {{.Title}}{{end}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+    <script>
+        document.addEventListener('htmx:responseError', function(e) {
+            if (e.detail.xhr.status === 401) {
+                window.location.href = '/login';
+            }
+        });
+    </script>
+</head>
+<body>
+    {{if .User}}
+    <nav>
+        <div class="container">
+            <a href="/" class="brand">Skladišče</a>
+            <div class="links">
+                <a href="/items">Predmeti</a>
+                <a href="/owners">Lastniki</a>
+                <a href="/transfers">Prenosi</a>
+                <a href="/transfers/new">Nov prenos</a>
+                {{if eq .User.Role "admin"}}
+                <a href="/users">Uporabniki</a>
+                {{end}}
+            </div>
+            <div class="user-info">
+                <span>{{.User.Username}} <span class="badge badge-{{.User.Role}}">{{.User.Role}}</span></span>
+                <a href="/settings">Nastavitve</a>
+                <form method="POST" action="/logout" style="display:inline">
+                    <button type="submit" class="btn btn-secondary btn-sm">Odjava</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+    {{end}}
+    <div class="container">
+        {{template "content" .}}
+    </div>
+</body>
+</html>
+{{end}}

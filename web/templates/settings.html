@@ -1,0 +1,25 @@
+{{define "content"}}
+<h1>Nastavitve</h1>
+
+{{if .Error}}
+<div class="alert alert-error">{{.Error}}</div>
+{{end}}
+{{if .Success}}
+<div class="alert alert-success">{{.Success}}</div>
+{{end}}
+
+<div class="card">
+    <h2>Spremeni geslo</h2>
+    <form method="POST" action="/settings">
+        <div class="form-group">
+            <label for="current_password">Trenutno geslo</label>
+            <input type="password" id="current_password" name="current_password" required>
+        </div>
+        <div class="form-group">
+            <label for="new_password">Novo geslo</label>
+            <input type="password" id="new_password" name="new_password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Spremeni geslo</button>
+    </form>
+</div>
+{{end}}
