@@ -124,7 +124,7 @@ h2 { font-size: 1.25rem; margin-bottom: 0.75rem; }
 .badge-location { background: #dcfce7; color: #166534; }
 .badge-active { background: #dcfce7; color: #166534; }
 .badge-damaged { background: #fef3c7; color: #92400e; }
-.badge-retired { background: #fee2e2; color: #991b1b; }
+.badge-lost { background: #fee2e2; color: #991b1b; }
 .badge-admin { background: #f3e8ff; color: #6b21a8; }
 .badge-manager { background: #dbeafe; color: #1e40af; }
 .badge-user { background: #e2e8f0; color: #475569; }

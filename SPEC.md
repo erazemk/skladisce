@@ -64,7 +64,7 @@ CREATE TABLE items (
     description TEXT,
     image       BLOB,
     image_mime  TEXT,
-    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'retired')),
+    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'lost')),
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  DATETIME
@@ -332,7 +332,7 @@ skladisce/
 | Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
 | Adjust for lost items          | Manager uses `/inventory/adjust` with negative delta + notes          |
 | Add stock to any owner         | `/inventory/stock` works for both locations and people (for pre-existing holdings) |
-| Status change to `retired`     | Informational flag; doesn't block transfers (admin decision)          |
+| Status change to `lost`        | Informational flag; doesn't block transfers (admin decision)          |
 | Password change (self)         | `PUT /api/auth/password` requires current password                    |
 | Password reset (admin)         | `PUT /api/users/:id/password` admin sets new password directly        |
 | htmx vs full page              | Handlers check `HX-Request` header; return fragment or full page      |
@@ -437,7 +437,7 @@ Examples:
 - Buttons: "Dodaj", "Uredi", "Izbriši", "Shrani", "Prekliči"
 - Labels: "Ime", "Opis", "Količina", "Lokacija", "Oseba", "Opombe"
 - Roles: "Administrator" (admin), "Skladiščar" (manager), "Uporabnik" (user)
-- Statuses: "Aktiven" (active), "Poškodovan" (damaged), "Umaknjen" (retired)
+- Statuses: "Aktiven" (active), "Poškodovan" (damaged), "Izgubljen" (lost)
 - Auth: "Prijava", "Odjava", "Uporabniško ime", "Geslo", "Spremeni geslo"
 
 ### Pages

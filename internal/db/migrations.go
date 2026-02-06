@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS items (
     description TEXT,
     image       BLOB,
     image_mime  TEXT,
-    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'retired')),
+    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'lost')),
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  DATETIME

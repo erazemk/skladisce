@@ -26,7 +26,7 @@
             <select id="status" name="status">
                 <option value="active" {{if eq .Item.Status "active"}}selected{{end}}>Aktiven</option>
                 <option value="damaged" {{if eq .Item.Status "damaged"}}selected{{end}}>Poškodovan</option>
-                <option value="retired" {{if eq .Item.Status "retired"}}selected{{end}}>Umaknjen</option>
+                <option value="lost" {{if eq .Item.Status "lost"}}selected{{end}}>Izgubljen</option>
             </select>
         </div>
         <div class="flex gap-1">
