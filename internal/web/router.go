@@ -35,6 +35,7 @@ func NewRouter(db *sql.DB, jwtSecret string) (http.Handler, error) {
 	mux.Handle("GET /{$}", cookieAuth(http.HandlerFunc(s.Dashboard)))
 
 	mux.Handle("GET /items", cookieAuth(http.HandlerFunc(s.ItemsPage)))
+	mux.Handle("POST /items", cookieAuth(http.HandlerFunc(s.ItemCreateSubmit)))
 	mux.Handle("GET /items/{id}", cookieAuth(http.HandlerFunc(s.ItemDetailPage)))
 	mux.Handle("POST /items/{id}", cookieAuth(http.HandlerFunc(s.ItemUpdateSubmit)))
 	mux.Handle("POST /items/{id}/stock", cookieAuth(http.HandlerFunc(s.ItemStockSubmit)))

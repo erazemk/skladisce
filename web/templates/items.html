@@ -9,7 +9,7 @@
 {{if roleAtLeast .User.Role "manager"}}
 <div id="add-form" class="card" style="display:none">
     <h2>Nov predmet</h2>
-    <form hx-post="/api/items" hx-headers='{"Authorization": "Bearer {{.Token}}"}' hx-target="#items-table" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { this.reset(); document.getElementById('add-form').style.display='none'; window.location.reload(); }">
+    <form method="POST" action="/items">
         <div class="form-group">
             <label for="name">Ime</label>
             <input type="text" id="name" name="name" required>

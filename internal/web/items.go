@@ -60,6 +60,26 @@ func (s *Server) ItemDetailPage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ItemCreateSubmit handles POST /items.
+func (s *Server) ItemCreateSubmit(w http.ResponseWriter, r *http.Request) {
+	claims := GetWebClaims(r.Context())
+	if !model.RoleAtLeast(claims.Role, model.RoleManager) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+
+	if name == "" {
+		http.Redirect(w, r, "/items", http.StatusSeeOther)
+		return
+	}
+
+	store.CreateItem(r.Context(), s.DB, name, description)
+	http.Redirect(w, r, "/items", http.StatusSeeOther)
+}
+
 // ItemUpdateSubmit handles POST /items/{id}.
 func (s *Server) ItemUpdateSubmit(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
