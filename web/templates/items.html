@@ -36,7 +36,7 @@
             <tr>
                 <td><a href="/items/{{.ID}}">{{.Name}}</a></td>
                 <td>{{.Description}}</td>
-                <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+                <td><span class="badge badge-{{.Status}}">{{statusName .Status}}</span></td>
                 <td>{{.CreatedAt.Format "02.01.2006"}}</td>
                 {{if roleAtLeast $.User.Role "manager"}}
                 <td>

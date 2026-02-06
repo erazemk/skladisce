@@ -435,6 +435,7 @@ Examples:
 - Buttons: "Dodaj", "Uredi", "Izbriši", "Shrani", "Prekliči"
 - Labels: "Ime", "Opis", "Količina", "Lokacija", "Oseba", "Opombe"
 - Roles: "Administrator" (admin), "Skladiščar" (manager), "Uporabnik" (user)
+- Statuses: "Aktiven" (active), "Poškodovan" (damaged), "Umaknjen" (retired)
 - Auth: "Prijava", "Odjava", "Uporabniško ime", "Geslo", "Spremeni geslo"
 
 ### Pages

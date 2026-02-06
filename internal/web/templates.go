@@ -34,6 +34,18 @@ func FuncMap() template.FuncMap {
 				return role
 			}
 		},
+		"statusName": func(status string) string {
+			switch status {
+			case "active":
+				return "Aktiven"
+			case "damaged":
+				return "Poškodovan"
+			case "retired":
+				return "Umaknjen"
+			default:
+				return status
+			}
+		},
 	}
 }
 
