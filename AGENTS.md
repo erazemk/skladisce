@@ -13,8 +13,8 @@ make run            — build + run serve with default flags
 make clean          — remove binary
 ```
 
-Always run `make build` after changes to ensure CGO_ENABLED=0 compilation.
-Run `make test` and `make lint` before committing.
+Always run `make build lint test` (single invocation) after changes.
+Do not run them as separate commands.
 
 ## Architecture
 
@@ -47,9 +47,7 @@ Both API and web layers share the same `store` package — no logic duplication.
 
 ## Testing Requirements
 
-- `make build` must compile with CGO_ENABLED=0
-- `make test` — all tests must pass
-- `make lint` — no warnings
+- `make build lint test` — must all pass before committing
 - New store functions need tests in the same package
 - New API endpoints need integration tests with a test HTTP server
 

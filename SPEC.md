@@ -431,6 +431,7 @@ Examples:
 - Navigation: "Predmeti", "Lastniki", "Prenosi", "Inventar", "Uporabniki"
 - Buttons: "Dodaj", "Uredi", "Izbriši", "Shrani", "Prekliči"
 - Labels: "Ime", "Opis", "Količina", "Lokacija", "Oseba", "Opombe"
+- Roles: "Administrator" (admin), "Skladiščar" (manager), "Uporabnik" (user)
 - Auth: "Prijava", "Odjava", "Uporabniško ime", "Geslo", "Spremeni geslo"
 
 ### Pages
@@ -465,10 +466,12 @@ need to work on the codebase. It is loaded automatically by pi at session start.
    run the project. Agents must be able to verify their own work.
    ```
    make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
-   make test           — go test ./...
+   make test           — go test -timeout 10s ./...
    make lint           — go vet ./...
    make run            — build + run serve with default flags
    ```
+
+   Run `make build lint test` as a single invocation to verify changes.
 
 2. **Architecture overview** — the layer diagram so agents understand where
    code belongs:

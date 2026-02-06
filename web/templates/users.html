@@ -23,7 +23,7 @@
             <label for="role">Vloga</label>
             <select id="role" name="role" required>
                 <option value="user">Uporabnik</option>
-                <option value="manager">Upravljalec</option>
+                <option value="manager">Skladiščar</option>
                 <option value="admin">Administrator</option>
             </select>
         </div>
@@ -43,7 +43,7 @@
             {{range .Users}}
             <tr>
                 <td>{{.Username}}</td>
-                <td><span class="badge badge-{{.Role}}">{{.Role}}</span></td>
+                <td><span class="badge badge-{{.Role}}">{{roleName .Role}}</span></td>
                 <td>{{.CreatedAt.Format "02.01.2006"}}</td>
                 <td>
                     <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani?" hx-target="closest tr" hx-swap="outerHTML">Izbriši</button>

@@ -22,6 +22,18 @@ type Templates struct {
 func FuncMap() template.FuncMap {
 	return template.FuncMap{
 		"roleAtLeast": model.RoleAtLeast,
+		"roleName": func(role string) string {
+			switch role {
+			case "admin":
+				return "Administrator"
+			case "manager":
+				return "Skladiščar"
+			case "user":
+				return "Uporabnik"
+			default:
+				return role
+			}
+		},
 	}
 }
 
