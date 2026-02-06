@@ -64,7 +64,7 @@ CREATE TABLE items (
     description TEXT,
     image       BLOB,
     image_mime  TEXT,
-    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'lost')),
+    status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'lost', 'removed')),
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  DATETIME
@@ -437,7 +437,7 @@ Examples:
 - Buttons: "Dodaj", "Uredi", "Izbriši", "Shrani", "Prekliči"
 - Labels: "Ime", "Opis", "Količina", "Lokacija", "Oseba", "Opombe"
 - Roles: "Administrator" (admin), "Skladiščar" (manager), "Uporabnik" (user)
-- Statuses: "Aktiven" (active), "Poškodovan" (damaged), "Izgubljen" (lost)
+- Statuses: "Aktiven" (active), "Poškodovan" (damaged), "Izgubljen" (lost), "Odpisan" (removed)
 - Auth: "Prijava", "Odjava", "Uporabniško ime", "Geslo", "Spremeni geslo"
 
 ### Pages

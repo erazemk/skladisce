@@ -118,7 +118,7 @@ func (h *ItemsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Status == "" {
 		req.Status = model.ItemStatusActive
 	}
-	if req.Status != model.ItemStatusActive && req.Status != model.ItemStatusDamaged && req.Status != model.ItemStatusLost {
+	if req.Status != model.ItemStatusActive && req.Status != model.ItemStatusDamaged && req.Status != model.ItemStatusLost && req.Status != model.ItemStatusRemoved {
 		jsonError(w, http.StatusBadRequest, "invalid status")
 		return
 	}

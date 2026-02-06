@@ -18,5 +18,6 @@ type Item struct {
 const (
 	ItemStatusActive  = "active"
 	ItemStatusDamaged = "damaged"
-	ItemStatusLost = "lost"
+	ItemStatusLost    = "lost"
+	ItemStatusRemoved = "removed"
 )

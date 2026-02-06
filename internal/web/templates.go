@@ -42,6 +42,8 @@ func FuncMap() template.FuncMap {
 				return "Poškodovan"
 			case "lost":
 				return "Izgubljen"
+			case "removed":
+				return "Odpisan"
 			default:
 				return status
 			}
