@@ -185,8 +185,9 @@ Server listening on :8080
 - Graceful shutdown on SIGINT/SIGTERM: stops accepting new connections, waits up
   to 5 seconds for in-flight requests to complete, then closes the database
   connection cleanly.
-- Request logging: every request logs method, URI, status code, and duration
-  (e.g., `POST /items 303 1ms`).
+- Request logging: structured via `slog` with fields `method`, `path`, `status`,
+  `duration`. Logs at INFO for success, WARN for 4xx, ERROR for 5xx.
+  All logs are written to both stdout and `skladisce.log` (append mode).
 
 ## API Endpoints
 

@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -12,7 +12,7 @@ func jsonResponse(w http.ResponseWriter, status int, data any) {
 	w.WriteHeader(status)
 	if data != nil {
 		if err := json.NewEncoder(w).Encode(data); err != nil {
-			log.Printf("error encoding response: %v", err)
+			slog.Error("failed to encode response", "error", err)
 		}
 	}
 }

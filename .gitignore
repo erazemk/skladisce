@@ -1,6 +1,9 @@
 # Binaries
 /skladisce
 
+# Logs
+*.log
+
 # Database
 *.db
 *.db-journal

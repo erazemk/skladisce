@@ -6,7 +6,8 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"os"
@@ -21,6 +22,8 @@ import (
 	"github.com/erazemk/skladisce/internal/store"
 	"github.com/erazemk/skladisce/internal/web"
 )
+
+const logFile = "skladisce.log"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -37,6 +40,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: skladisce <init|serve>\n", os.Args[1])
 		os.Exit(1)
 	}
+}
+
+// setupLogger configures slog to write to both stdout and the log file.
+func setupLogger() (*os.File, error) {
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("opening log file: %w", err)
+	}
+
+	w := io.MultiWriter(os.Stdout, f)
+	handler := slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})
+	slog.SetDefault(slog.New(handler))
+
+	return f, nil
 }
 
 func cmdInit(args []string) {
@@ -68,21 +85,31 @@ func cmdServe(args []string) {
 	adminUser := fs.String("admin", "admin", "admin account username (used if DB is auto-initialized)")
 	fs.Parse(args)
 
+	// Set up structured logging to stdout + file.
+	logf, err := setupLogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer logf.Close()
+
 	// Auto-generate JWT secret if not provided.
 	if *jwtSecret == "" {
 		secret, err := generatePassword(32)
 		if err != nil {
-			log.Fatalf("Failed to generate JWT secret: %v", err)
+			slog.Error("failed to generate JWT secret", "error", err)
+			os.Exit(1)
 		}
 		*jwtSecret = secret
-		log.Println("JWT secret auto-generated (tokens will be invalidated on restart)")
+		slog.Warn("JWT secret auto-generated, tokens will be invalidated on restart")
 	}
 
 	// Check if DB exists, auto-init if not.
 	if _, err := os.Stat(*dbPath); os.IsNotExist(err) {
 		database, password, err := initDatabase(*dbPath, *adminUser)
 		if err != nil {
-			log.Fatalf("Failed to initialize database: %v", err)
+			slog.Error("failed to initialize database", "error", err)
+			os.Exit(1)
 		}
 		database.Close()
 
@@ -93,20 +120,25 @@ func cmdServe(args []string) {
 	// Open database.
 	database, err := db.Open(*dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		slog.Error("failed to open database", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
 	// Run migrations (idempotent).
 	if err := db.Migrate(database); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		slog.Error("failed to migrate database", "error", err)
+		os.Exit(1)
 	}
+
+	slog.Info("database ready", "path", *dbPath)
 
 	// Set up routers.
 	apiRouter := api.NewRouter(database, *jwtSecret)
 	webRouter, err := web.NewRouter(database, *jwtSecret)
 	if err != nil {
-		log.Fatalf("Failed to set up web router: %v", err)
+		slog.Error("failed to set up web router", "error", err)
+		os.Exit(1)
 	}
 
 	// Combine: API routes take priority, web routes handle the rest.
@@ -126,23 +158,24 @@ func cmdServe(args []string) {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-quit
-		log.Println("Shutting down server...")
+		sig := <-quit
+		slog.Info("shutdown signal received", "signal", sig.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("Server forced to shutdown: %v", err)
+			slog.Error("server forced to shutdown", "error", err)
 		}
 	}()
 
-	fmt.Printf("Server listening on %s\n", *addr)
+	slog.Info("server started", "addr", *addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server stopped, closing database...")
+	slog.Info("server stopped, closing database")
 }
 
 // initDatabase creates a new database, runs migrations, and creates the admin user.

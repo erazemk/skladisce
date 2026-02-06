@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/erazemk/skladisce/internal/auth"
@@ -106,7 +106,7 @@ func (ts *Templates) Render(w http.ResponseWriter, name string, data any) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Printf("error rendering template %s: %v", name, err)
+		slog.Error("failed to render template", "template", name, "error", err)
 	}
 }
 
