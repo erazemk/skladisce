@@ -53,6 +53,7 @@ func NewRouter(db *sql.DB, jwtSecret string) (http.Handler, error) {
 	mux.Handle("GET /users", cookieAuth(http.HandlerFunc(s.UsersPage)))
 	mux.Handle("POST /users", cookieAuth(http.HandlerFunc(s.UserCreateSubmit)))
 	mux.Handle("POST /users/{id}/password", cookieAuth(http.HandlerFunc(s.UserResetPasswordSubmit)))
+	mux.Handle("POST /users/{id}/role", cookieAuth(http.HandlerFunc(s.UserUpdateRoleSubmit)))
 
 	mux.Handle("GET /settings", cookieAuth(http.HandlerFunc(s.SettingsPage)))
 	mux.Handle("POST /settings", cookieAuth(http.HandlerFunc(s.SettingsSubmit)))

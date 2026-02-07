@@ -133,3 +133,51 @@ func TestUpdateUserPassword(t *testing.T) {
 		t.Errorf("expected password hash 'newhash', got %q", got.PasswordHash)
 	}
 }
+
+func TestUpdateUserRole(t *testing.T) {
+	database := db.NewTestDB(t)
+	ctx := context.Background()
+
+	user, _ := CreateUser(ctx, database, "roleuser", "hash", model.RoleUser)
+
+	// Update role to manager.
+	if err := UpdateUser(ctx, database, user.ID, model.RoleManager); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+	got, _ := GetUser(ctx, database, user.ID)
+	if got.Role != model.RoleManager {
+		t.Errorf("expected role 'manager', got %q", got.Role)
+	}
+
+	// Update role to admin.
+	if err := UpdateUser(ctx, database, user.ID, model.RoleAdmin); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+	got, _ = GetUser(ctx, database, user.ID)
+	if got.Role != model.RoleAdmin {
+		t.Errorf("expected role 'admin', got %q", got.Role)
+	}
+}
+
+func TestUpdateUserRoleNotFound(t *testing.T) {
+	database := db.NewTestDB(t)
+	ctx := context.Background()
+
+	// Non-existent user should return error.
+	if err := UpdateUser(ctx, database, 9999, model.RoleAdmin); err == nil {
+		t.Error("expected error for non-existent user, got nil")
+	}
+}
+
+func TestUpdateUserRoleDeletedUser(t *testing.T) {
+	database := db.NewTestDB(t)
+	ctx := context.Background()
+
+	user, _ := CreateUser(ctx, database, "deleted", "hash", model.RoleUser)
+	DeleteUser(ctx, database, user.ID)
+
+	// Updating a soft-deleted user should return error.
+	if err := UpdateUser(ctx, database, user.ID, model.RoleAdmin); err == nil {
+		t.Error("expected error for deleted user, got nil")
+	}
+}

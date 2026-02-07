@@ -96,6 +96,46 @@ func (s *Server) UserResetPasswordSubmit(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
+// UserUpdateRoleSubmit handles POST /users/{id}/role (admin only).
+func (s *Server) UserUpdateRoleSubmit(w http.ResponseWriter, r *http.Request) {
+	claims := GetWebClaims(r.Context())
+	if !model.RoleAtLeast(claims.Role, model.RoleAdmin) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	role := r.FormValue("role")
+	if role != model.RoleAdmin && role != model.RoleManager && role != model.RoleUser {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	if claims.UserID == id {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	if err := store.UpdateUser(r.Context(), s.DB, id, role); err != nil {
+		slog.Error("failed to update user role", "user", claims.Username, "target_id", id, "error", err)
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	target, _ := store.GetUser(r.Context(), s.DB, id)
+	targetName := fmt.Sprintf("id:%d", id)
+	if target != nil {
+		targetName = target.Username
+	}
+	slog.Info("user role updated", "user", claims.Username, "target_user", targetName, "new_role", role)
+	http.Redirect(w, r, "/users", http.StatusSeeOther)
+}
+
 // SettingsPage handles GET /settings.
 func (s *Server) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())

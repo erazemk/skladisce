@@ -11,11 +11,8 @@
 *.sqlite3-wal
 *.sqlite3-shm
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+# Logs
+*.log
 
 # OS
 .DS_Store

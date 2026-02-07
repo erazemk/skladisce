@@ -47,6 +47,7 @@
                 <td>{{.CreatedAt.Format "02.01.2006"}}</td>
                 <td class="flex gap-1">
                     {{if ne .ID $.User.UserID}}
+                    <button class="btn btn-secondary btn-sm" onclick="openRoleModal({{.ID}}, '{{.Username}}', '{{.Role}}')">Spremeni vlogo</button>
                     <button class="btn btn-secondary btn-sm" onclick="openResetModal({{.ID}}, '{{.Username}}')">Ponastavi geslo</button>
                     <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani, da želite izbrisati uporabnika {{.Username}}?" hx-target="closest tr" hx-swap="delete">Izbriši</button>
                     {{else}}
@@ -78,6 +79,29 @@
         </form>
     </div>
 </div>
+
+<!-- Role change modal -->
+<div id="role-modal" class="modal" style="display:none">
+    <div class="card" style="max-width:400px; margin:10vh auto">
+        <h2>Spremeni vlogo</h2>
+        <p>Nova vloga za uporabnika <strong id="role-username"></strong>:</p>
+        <form method="POST" id="role-form">
+            <div class="form-group">
+                <label for="role-select">Vloga</label>
+                <select id="role-select" name="role" required>
+                    <option value="user">Uporabnik</option>
+                    <option value="manager">Skladiščar</option>
+                    <option value="admin">Administrator</option>
+                </select>
+            </div>
+            <div class="flex gap-1">
+                <button type="submit" class="btn btn-primary">Shrani</button>
+                <button type="button" class="btn btn-secondary" onclick="closeRoleModal()">Prekliči</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
 .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
 </style>
@@ -91,6 +115,15 @@ function openResetModal(id, username) {
 }
 function closeResetModal() {
     document.getElementById('reset-modal').style.display = 'none';
+}
+function openRoleModal(id, username, currentRole) {
+    document.getElementById('role-username').textContent = username;
+    document.getElementById('role-form').action = '/users/' + id + '/role';
+    document.getElementById('role-select').value = currentRole;
+    document.getElementById('role-modal').style.display = 'block';
+}
+function closeRoleModal() {
+    document.getElementById('role-modal').style.display = 'none';
 }
 </script>
 {{end}}

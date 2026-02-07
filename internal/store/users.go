@@ -80,14 +80,22 @@ func ListUsers(ctx context.Context, db *sql.DB) ([]model.User, error) {
 	return users, rows.Err()
 }
 
-// UpdateUser updates a user's role.
+// UpdateUser updates a user's role. Returns an error if the user does not exist
+// or is soft-deleted.
 func UpdateUser(ctx context.Context, db *sql.DB, id int64, role string) error {
-	_, err := db.ExecContext(ctx,
+	result, err := db.ExecContext(ctx,
 		`UPDATE users SET role = ? WHERE id = ? AND deleted_at IS NULL`,
 		role, id,
 	)
 	if err != nil {
 		return fmt.Errorf("updating user: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updating user rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("updating user: user not found")
 	}
 	return nil
 }

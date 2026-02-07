@@ -436,7 +436,7 @@ Examples:
 | Transfers      | `GET /transfers`    | all       | Transfer log with filters                   |
 | New transfer   | `GET /transfers/new`| all       | Form: pick item, from, to, quantity         |
 | Settings       | `GET /settings`     | all       | Change own password                         |
-| Users          | `GET /users`        | admin     | User management (create, reset passwords)   |
+| Users          | `GET /users`        | admin     | User management (create, change roles, reset passwords) |
 
 ## Agent-First Development
 
