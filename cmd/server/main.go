@@ -74,8 +74,8 @@ func main() {
 	fs.StringVar(&addr, "a", ":8080", "")
 
 	var adminUser string
-	fs.StringVar(&adminUser, "username", "admin", "")
-	fs.StringVar(&adminUser, "u", "admin", "")
+	fs.StringVar(&adminUser, "username", "Admin", "")
+	fs.StringVar(&adminUser, "u", "Admin", "")
 
 	fs.Usage = func() {
 		fmt.Fprint(os.Stdout, `Usage: skladisce [flags]
@@ -83,7 +83,7 @@ func main() {
 Flags:
   -d, -db <path>          SQLite database path (default: skladisce.sqlite3)
   -a, -addr <host:port>   listen address (default: :8080)
-  -u, -username <name>    admin username on first run (default: admin)
+  -u, -username <name>    admin username on first run (default: Admin)
   -h, -help               show this help and exit
 `)
 	}
