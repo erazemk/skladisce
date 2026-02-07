@@ -63,68 +63,62 @@ func setupLogger() {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: skladisce <init|serve>")
+	fs := flag.NewFlagSet("skladisce", flag.ContinueOnError)
+
+	var dbPath string
+	fs.StringVar(&dbPath, "db", "skladisce.sqlite3", "")
+	fs.StringVar(&dbPath, "d", "skladisce.sqlite3", "")
+
+	var addr string
+	fs.StringVar(&addr, "addr", ":8080", "")
+	fs.StringVar(&addr, "a", ":8080", "")
+
+	var adminUser string
+	fs.StringVar(&adminUser, "username", "admin", "")
+	fs.StringVar(&adminUser, "u", "admin", "")
+
+	fs.Usage = func() {
+		fmt.Fprint(os.Stdout, `Usage: skladisce [flags]
+
+Flags:
+  -d, -db <path>          SQLite database path (default: skladisce.sqlite3)
+  -a, -addr <host:port>   listen address (default: :8080)
+  -u, -username <name>    admin username on first run (default: admin)
+  -h, -help               show this help and exit
+`)
+	}
+
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
 		os.Exit(1)
 	}
 
-	switch os.Args[1] {
-	case "init":
-		cmdInit(os.Args[2:])
-	case "serve":
-		cmdServe(os.Args[2:])
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: skladisce <init|serve>\n", os.Args[1])
+	if fs.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unexpected argument: %s\n", fs.Arg(0))
+		fs.Usage()
 		os.Exit(1)
 	}
-}
-
-func cmdInit(args []string) {
-	fs := flag.NewFlagSet("init", flag.ExitOnError)
-	dbPath := fs.String("db", "skladisce.sqlite3", "path to SQLite database file")
-	adminUser := fs.String("admin", "admin", "admin account username")
-	fs.Parse(args)
-
-	if _, err := os.Stat(*dbPath); err == nil {
-		fmt.Fprintf(os.Stderr, "Error: database file %s already exists\n", *dbPath)
-		os.Exit(1)
-	}
-
-	database, password, err := initDatabase(*dbPath, *adminUser)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	database.Close()
-
-	printInitResult(*dbPath, *adminUser, password)
-}
-
-func cmdServe(args []string) {
-	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	dbPath := fs.String("db", "skladisce.sqlite3", "path to SQLite database file")
-	addr := fs.String("addr", ":8080", "listen address")
-	adminUser := fs.String("admin", "admin", "admin account username (used if DB is auto-initialized)")
-	fs.Parse(args)
 
 	// Set up structured logging: INFO/WARN → stdout, ERROR → stderr.
 	setupLogger()
 
 	// Check if DB exists, auto-init if not.
-	if _, err := os.Stat(*dbPath); os.IsNotExist(err) {
-		database, password, err := initDatabase(*dbPath, *adminUser)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		database, password, err := initDatabase(dbPath, adminUser)
 		if err != nil {
 			slog.Error("failed to initialize database", "error", err)
 			os.Exit(1)
 		}
 		database.Close()
 
-		printInitResult(*dbPath, *adminUser, password)
+		printInitResult(dbPath, adminUser, password)
 		fmt.Println()
 	}
 
 	// Open database.
-	database, err := db.Open(*dbPath)
+	database, err := db.Open(dbPath)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
@@ -137,7 +131,7 @@ func cmdServe(args []string) {
 		os.Exit(1)
 	}
 
-	slog.Info("database ready", "path", *dbPath)
+	slog.Info("database ready", "path", dbPath)
 
 	// Load JWT secret from database (auto-generated on first run).
 	jwtSecret, err := store.GetJWTSecret(context.Background(), database)
@@ -162,7 +156,7 @@ func cmdServe(args []string) {
 	handler := api.LoggingMiddleware(mux)
 
 	server := &http.Server{
-		Addr:    *addr,
+		Addr:    addr,
 		Handler: handler,
 	}
 
@@ -182,7 +176,7 @@ func cmdServe(args []string) {
 		}
 	}()
 
-	slog.Info("server started", "addr", *addr)
+	slog.Info("server started", "addr", addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error", "error", err)
 		os.Exit(1)

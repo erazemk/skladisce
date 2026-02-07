@@ -10,7 +10,7 @@ lint:
 	go vet ./...
 
 run: build
-	./skladisce serve
+	./skladisce
 
 clean:
 	rm -f skladisce
