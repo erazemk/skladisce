@@ -1,6 +1,7 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -50,7 +51,7 @@ func (s *Server) TransferCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	notes := r.FormValue("notes")
 
 	userID := claims.UserID
-	_, err := store.CreateTransfer(r.Context(), s.DB, itemID, fromOwnerID, toOwnerID, quantity, notes, &userID)
+	transfer, err := store.CreateTransfer(r.Context(), s.DB, itemID, fromOwnerID, toOwnerID, quantity, notes, &userID)
 
 	if err != nil {
 		items, _ := store.ListItems(r.Context(), s.DB, "")
@@ -68,5 +69,8 @@ func (s *Server) TransferCreateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("transfer created", "user", claims.Username,
+		"item", transfer.ItemName, "quantity", transfer.Quantity,
+		"from", transfer.FromOwnerName, "to", transfer.ToOwnerName)
 	http.Redirect(w, r, "/transfers", http.StatusSeeOther)
 }

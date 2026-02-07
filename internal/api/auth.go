@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -54,6 +55,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		slog.Warn("login failed", "username", req.Username, "remote", r.RemoteAddr)
 		jsonError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -64,6 +66,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("user logged in", "user", user.Username, "role", user.Role)
 	jsonResponse(w, http.StatusOK, loginResponse{Token: token})
 }
 
@@ -108,5 +111,6 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("user changed own password", "user", claims.Username)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "password updated"})
 }

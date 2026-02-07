@@ -1,6 +1,7 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -37,6 +38,7 @@ func (s *Server) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		slog.Warn("login failed", "username", username, "remote", r.RemoteAddr)
 		s.Templates.Render(w, "login.html", &PageData{
 			Title: "Prijava",
 			Error: "Napačno uporabniško ime ali geslo.",
@@ -62,6 +64,7 @@ func (s *Server) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   86400, // 24 hours
 	})
 
+	slog.Info("user logged in", "user", user.Username, "role", user.Role)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

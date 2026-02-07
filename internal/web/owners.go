@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -68,6 +69,7 @@ func (s *Server) OwnerCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.CreateOwner(r.Context(), s.DB, name, ownerType)
+	slog.Info("owner created", "user", claims.Username, "owner", name, "type", ownerType)
 	http.Redirect(w, r, "/owners", http.StatusSeeOther)
 }
 
@@ -92,5 +94,6 @@ func (s *Server) OwnerUpdateSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.UpdateOwner(r.Context(), s.DB, id, name)
+	slog.Info("owner updated", "user", claims.Username, "owner", name)
 	http.Redirect(w, r, fmt.Sprintf("/owners/%d", id), http.StatusSeeOther)
 }

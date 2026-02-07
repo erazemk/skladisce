@@ -2,7 +2,9 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -59,6 +61,8 @@ func (h *ItemsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("item created", "user", claims.Username, "item", req.Name)
 	jsonResponse(w, http.StatusCreated, item)
 }
 
@@ -128,6 +132,8 @@ func (h *ItemsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("item updated", "user", claims.Username, "item", req.Name, "status", req.Status)
 	item, _ := store.GetItem(r.Context(), h.DB, id)
 	jsonResponse(w, http.StatusOK, item)
 }
@@ -140,11 +146,19 @@ func (h *ItemsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	item, _ := store.GetItem(r.Context(), h.DB, id)
+	itemName := fmt.Sprintf("id:%d", id)
+	if item != nil {
+		itemName = item.Name
+	}
+
 	if err := store.DeleteItem(r.Context(), h.DB, id); err != nil {
 		jsonError(w, http.StatusInternalServerError, "failed to delete item")
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("item deleted", "user", claims.Username, "item", itemName)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "item deleted"})
 }
 
@@ -189,6 +203,13 @@ func (h *ItemsHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	item, _ := store.GetItem(r.Context(), h.DB, id)
+	itemName := fmt.Sprintf("id:%d", id)
+	if item != nil {
+		itemName = item.Name
+	}
+	slog.Info("item image uploaded", "user", claims.Username, "item", itemName)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "image uploaded"})
 }
 

@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -77,6 +78,7 @@ func (s *Server) ItemCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.CreateItem(r.Context(), s.DB, name, description)
+	slog.Info("item created", "user", claims.Username, "item", name)
 	http.Redirect(w, r, "/items", http.StatusSeeOther)
 }
 
@@ -103,6 +105,7 @@ func (s *Server) ItemUpdateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("item updated", "user", claims.Username, "item", name, "status", status)
 	http.Redirect(w, r, fmt.Sprintf("/items/%d", id), http.StatusSeeOther)
 }
 
@@ -129,6 +132,17 @@ func (s *Server) ItemStockSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	item, _ := store.GetItem(r.Context(), s.DB, id)
+	owner, _ := store.GetOwner(r.Context(), s.DB, ownerID)
+	itemName := fmt.Sprintf("id:%d", id)
+	ownerName := fmt.Sprintf("id:%d", ownerID)
+	if item != nil {
+		itemName = item.Name
+	}
+	if owner != nil {
+		ownerName = owner.Name
+	}
+	slog.Info("stock added", "user", claims.Username, "item", itemName, "owner", ownerName, "quantity", quantity)
 	http.Redirect(w, r, fmt.Sprintf("/items/%d", id), http.StatusSeeOther)
 }
 
@@ -176,5 +190,11 @@ func (s *Server) ItemImageSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	item, _ := store.GetItem(r.Context(), s.DB, id)
+	itemName := fmt.Sprintf("id:%d", id)
+	if item != nil {
+		itemName = item.Name
+	}
+	slog.Info("item image uploaded", "user", claims.Username, "item", itemName)
 	http.Redirect(w, r, fmt.Sprintf("/items/%d", id), http.StatusSeeOther)
 }

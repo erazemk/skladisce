@@ -2,6 +2,8 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/erazemk/skladisce/internal/model"
@@ -63,6 +65,17 @@ func (h *InventoryHandler) AddStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	item, _ := store.GetItem(r.Context(), h.DB, req.ItemID)
+	owner, _ := store.GetOwner(r.Context(), h.DB, req.OwnerID)
+	itemName := fmt.Sprintf("id:%d", req.ItemID)
+	ownerName := fmt.Sprintf("id:%d", req.OwnerID)
+	if item != nil {
+		itemName = item.Name
+	}
+	if owner != nil {
+		ownerName = owner.Name
+	}
+	slog.Info("stock added", "user", claims.Username, "item", itemName, "owner", ownerName, "quantity", req.Quantity)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "stock added"})
 }
 
@@ -90,5 +103,16 @@ func (h *InventoryHandler) Adjust(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	item, _ := store.GetItem(r.Context(), h.DB, req.ItemID)
+	owner, _ := store.GetOwner(r.Context(), h.DB, req.OwnerID)
+	itemName := fmt.Sprintf("id:%d", req.ItemID)
+	ownerName := fmt.Sprintf("id:%d", req.OwnerID)
+	if item != nil {
+		itemName = item.Name
+	}
+	if owner != nil {
+		ownerName = owner.Name
+	}
+	slog.Info("inventory adjusted", "user", claims.Username, "item", itemName, "owner", ownerName, "delta", req.Delta)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "inventory adjusted"})
 }

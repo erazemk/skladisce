@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -47,6 +48,9 @@ func (h *TransfersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("transfer created", "user", claims.Username,
+		"item", transfer.ItemName, "quantity", transfer.Quantity,
+		"from", transfer.FromOwnerName, "to", transfer.ToOwnerName)
 	jsonResponse(w, http.StatusCreated, transfer)
 }
 

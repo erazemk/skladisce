@@ -2,6 +2,8 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -61,6 +63,8 @@ func (h *OwnersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("owner created", "user", claims.Username, "owner", req.Name, "type", req.Type)
 	jsonResponse(w, http.StatusCreated, owner)
 }
 
@@ -109,6 +113,8 @@ func (h *OwnersHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("owner updated", "user", claims.Username, "owner", req.Name)
 	owner, _ := store.GetOwner(r.Context(), h.DB, id)
 	jsonResponse(w, http.StatusOK, owner)
 }
@@ -121,11 +127,19 @@ func (h *OwnersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	owner, _ := store.GetOwner(r.Context(), h.DB, id)
+	ownerName := fmt.Sprintf("id:%d", id)
+	if owner != nil {
+		ownerName = owner.Name
+	}
+
 	if err := store.DeleteOwner(r.Context(), h.DB, id); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("owner deleted", "user", claims.Username, "owner", ownerName)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "owner deleted"})
 }
 

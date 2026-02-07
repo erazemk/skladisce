@@ -1,6 +1,8 @@
 package web
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -53,6 +55,7 @@ func (s *Server) UserCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.CreateUser(r.Context(), s.DB, username, string(hash), role)
+	slog.Info("user created", "user", claims.Username, "new_user", username, "role", role)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
@@ -83,6 +86,13 @@ func (s *Server) UserResetPasswordSubmit(w http.ResponseWriter, r *http.Request)
 	}
 
 	store.UpdateUserPassword(r.Context(), s.DB, id, string(hash))
+
+	target, _ := store.GetUser(r.Context(), s.DB, id)
+	targetName := fmt.Sprintf("id:%d", id)
+	if target != nil {
+		targetName = target.Username
+	}
+	slog.Info("user password reset", "user", claims.Username, "target_user", targetName)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
@@ -155,6 +165,7 @@ func (s *Server) SettingsSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("user changed own password", "user", claims.Username)
 	s.Templates.Render(w, "settings.html", &PageData{
 		Title:   "Nastavitve",
 		User:    claims,

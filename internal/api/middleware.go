@@ -73,32 +73,36 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// LoggingMiddleware logs HTTP requests with structured fields.
+// LoggingMiddleware logs HTTP requests that result in client or server errors (4xx/5xx).
+// Successful requests are not logged here — business-level actions are logged by handlers.
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		duration := time.Since(start)
 
+		if rec.status < 400 {
+			return
+		}
+
+		duration := time.Since(start)
 		attrs := []any{
 			"method", r.Method,
 			"path", r.URL.RequestURI(),
 			"status", rec.status,
 			"duration", duration.Round(time.Millisecond).String(),
+			"remote", r.RemoteAddr,
 		}
 
-		// Add user info if authenticated via cookie or bearer.
+		// Add user info if authenticated.
 		if claims := GetClaims(r.Context()); claims != nil {
 			attrs = append(attrs, "user", claims.Username)
 		}
 
 		if rec.status >= 500 {
 			slog.Error("request", attrs...)
-		} else if rec.status >= 400 {
-			slog.Warn("request", attrs...)
 		} else {
-			slog.Info("request", attrs...)
+			slog.Warn("request", attrs...)
 		}
 	})
 }

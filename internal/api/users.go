@@ -2,6 +2,8 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -73,6 +75,8 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	slog.Info("user created", "user", claims.Username, "new_user", req.Username, "role", req.Role)
 	jsonResponse(w, http.StatusCreated, user)
 }
 
@@ -122,6 +126,10 @@ func (h *UsersHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, _ := store.GetUser(r.Context(), h.DB, id)
+	claims := GetClaims(r.Context())
+	if user != nil {
+		slog.Info("user role updated", "user", claims.Username, "target_user", user.Username, "new_role", req.Role)
+	}
 	jsonResponse(w, http.StatusOK, user)
 }
 
@@ -155,6 +163,13 @@ func (h *UsersHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := GetClaims(r.Context())
+	target, _ := store.GetUser(r.Context(), h.DB, id)
+	targetName := fmt.Sprintf("id:%d", id)
+	if target != nil {
+		targetName = target.Username
+	}
+	slog.Info("user password reset", "user", claims.Username, "target_user", targetName)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "password reset"})
 }
 
@@ -173,10 +188,18 @@ func (h *UsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Look up target name before deleting.
+	target, _ := store.GetUser(r.Context(), h.DB, id)
+	targetName := fmt.Sprintf("id:%d", id)
+	if target != nil {
+		targetName = target.Username
+	}
+
 	if err := store.DeleteUser(r.Context(), h.DB, id); err != nil {
 		jsonError(w, http.StatusInternalServerError, "failed to delete user")
 		return
 	}
 
+	slog.Info("user deleted", "user", claims.Username, "deleted_user", targetName)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "user deleted"})
 }
