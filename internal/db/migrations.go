@@ -63,29 +63,11 @@ CREATE TABLE IF NOT EXISTS transfers (
 );
 `
 
-// migrations is a list of SQL statements applied in order after schema creation.
-// Each migration must be idempotent. Append new migrations at the end.
-var migrations = []string{
-	// Migration 1: Replace hard UNIQUE on username with a partial unique index
-	// that only covers active (non-deleted) users so that soft-deleted usernames
-	// can be reused.
-	`DROP INDEX IF EXISTS sqlite_autoindex_users_1`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active
-	     ON users(username) WHERE deleted_at IS NULL`,
-}
-
 // Migrate runs the database schema migrations.
 func Migrate(db *sql.DB) error {
 	_, err := db.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("running migrations: %w", err)
 	}
-
-	for i, m := range migrations {
-		if _, err := db.Exec(m); err != nil {
-			return fmt.Errorf("running migration %d: %w", i+1, err)
-		}
-	}
-
 	return nil
 }
