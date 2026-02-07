@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS inventory (
     PRIMARY KEY (item_id, owner_id)
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS transfers (
     id             INTEGER PRIMARY KEY,
     item_id        INTEGER NOT NULL REFERENCES items(id),

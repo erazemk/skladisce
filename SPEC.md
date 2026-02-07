@@ -89,6 +89,12 @@ CREATE TABLE transfers (
     transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     transferred_by INTEGER REFERENCES users(id)
 );
+
+-- Application settings (e.g. JWT secret)
+CREATE TABLE settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 ```
 
 ### Key Design Decisions
@@ -173,8 +179,6 @@ Server listening on :8080
 **Flags:**
 - `--db <path>` — path to the SQLite database file (default: `skladisce.sqlite3`)
 - `--addr <host:port>` — listen address (default: `:8080`)
-- `--jwt-secret <secret>` — JWT signing key (default: auto-generated on startup;
-  note: auto-generated secrets invalidate all tokens on restart)
 - `--admin <username>` — admin account username, used only when auto-initializing
   a new database (default: `admin`)
 
@@ -341,6 +345,10 @@ skladisce/
 | Server shutdown (Ctrl+C)       | Graceful: finish in-flight requests (5s timeout), close DB cleanly    |
 
 ## Auth Flow
+
+- **JWT secret** is stored in the `settings` table in the database. It is
+  auto-generated on first startup and persists across restarts.
+- **Token expiry** is 7 days. Users must re-login after that.
 
 ### JSON API (`/api/*`)
 

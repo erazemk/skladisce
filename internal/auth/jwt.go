@@ -16,7 +16,7 @@ type Claims struct {
 }
 
 // TokenExpiry is the default token lifetime.
-const TokenExpiry = 24 * time.Hour
+const TokenExpiry = 7 * 24 * time.Hour
 
 // GenerateToken creates a new JWT for a user.
 func GenerateToken(secret string, userID int64, username, role string) (string, error) {

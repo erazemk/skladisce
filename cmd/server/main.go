@@ -104,23 +104,11 @@ func cmdServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	dbPath := fs.String("db", "skladisce.sqlite3", "path to SQLite database file")
 	addr := fs.String("addr", ":8080", "listen address")
-	jwtSecret := fs.String("jwt-secret", "", "JWT signing key (auto-generated if empty)")
 	adminUser := fs.String("admin", "admin", "admin account username (used if DB is auto-initialized)")
 	fs.Parse(args)
 
 	// Set up structured logging: INFO/WARN → stdout, ERROR → stderr.
 	setupLogger()
-
-	// Auto-generate JWT secret if not provided.
-	if *jwtSecret == "" {
-		secret, err := generatePassword(32)
-		if err != nil {
-			slog.Error("failed to generate JWT secret", "error", err)
-			os.Exit(1)
-		}
-		*jwtSecret = secret
-		slog.Warn("JWT secret auto-generated, tokens will be invalidated on restart")
-	}
 
 	// Check if DB exists, auto-init if not.
 	if _, err := os.Stat(*dbPath); os.IsNotExist(err) {
@@ -151,9 +139,16 @@ func cmdServe(args []string) {
 
 	slog.Info("database ready", "path", *dbPath)
 
+	// Load JWT secret from database (auto-generated on first run).
+	jwtSecret, err := store.GetJWTSecret(context.Background(), database)
+	if err != nil {
+		slog.Error("failed to get JWT secret", "error", err)
+		os.Exit(1)
+	}
+
 	// Set up routers.
-	apiRouter := api.NewRouter(database, *jwtSecret)
-	webRouter, err := web.NewRouter(database, *jwtSecret)
+	apiRouter := api.NewRouter(database, jwtSecret)
+	webRouter, err := web.NewRouter(database, jwtSecret)
 	if err != nil {
 		slog.Error("failed to set up web router", "error", err)
 		os.Exit(1)
