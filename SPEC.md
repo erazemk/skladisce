@@ -224,7 +224,7 @@ POST   /api/inventory/adjust       — adjust quantity (correct errors, losses) 
 
 ```
 skladisce/
-├── cmd/server/
+├── cmd/skladisce/
 │   └── main.go                  — entry point, flag parsing, server startup
 ├── internal/
 │   ├── api/                     — JSON API handlers (/api/*)
@@ -448,7 +448,7 @@ need to work on the codebase. It is loaded automatically by pi at session start.
 1. **Build & verify commands** — the exact commands to build, test, lint, and
    run the project. Agents must be able to verify their own work.
    ```
-   make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
+   make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/skladisce
    make test           — go test -timeout 10s ./...
    make lint           — go vet ./...
    make run            — build + run serve with default flags
@@ -459,7 +459,7 @@ need to work on the codebase. It is loaded automatically by pi at session start.
 2. **Architecture overview** — the layer diagram so agents understand where
    code belongs:
    ```
-   cmd/server/main.go → internal/api/  (JSON)  → internal/store/ → internal/db/
+   cmd/skladisce/main.go → internal/api/  (JSON)  → internal/store/ → internal/db/
                        → internal/web/  (HTML)  → internal/store/ → internal/db/
    ```
 
@@ -505,7 +505,7 @@ always use `make` targets rather than running raw commands, ensuring consistency
 .PHONY: build test lint run clean
 
 build:
-	CGO_ENABLED=0 go build -o skladisce ./cmd/server
+	CGO_ENABLED=0 go build -o skladisce ./cmd/skladisce
 
 test:
 	go test -timeout 10s ./...

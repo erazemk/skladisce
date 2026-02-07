@@ -6,7 +6,7 @@ for the full specification.
 ## Build & Verify Commands
 
 ```
-make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
+make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/skladisce
 make test           — go test -timeout 10s ./...
 make lint           — go vet ./...
 make run            — build + run with default flags
@@ -19,7 +19,7 @@ Do not run them as separate commands.
 ## Architecture
 
 ```
-cmd/server/main.go → internal/api/  (JSON /api/*)  → internal/store/ → internal/db/
+cmd/skladisce/main.go → internal/api/  (JSON /api/*)  → internal/store/ → internal/db/
                    → internal/web/  (HTML /*)       → internal/store/ → internal/db/
 ```
 
