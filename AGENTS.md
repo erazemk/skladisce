@@ -68,14 +68,28 @@ to ask — committing is part of completing a task.
 Read `SPEC.md` before making architectural decisions. If spec and code disagree,
 the spec wins. Update the spec first, then the code.
 
-**Spec-update rule:** Any time a new requirement is added, a behavior changes,
-or a functional decision is made, `SPEC.md` must be updated in the same commit
-(or before the code change). This includes:
+**Documentation-update rule:** After any significant code change, review and
+update **all** affected documentation files in the same commit. Documentation
+files include (but are not limited to):
+- `README.md` — user-facing overview, install/usage instructions, examples
+- `SPEC.md` — authoritative specification (behavior, schema, CLI, API, UI)
+- `AGENTS.md` — agent instructions and conventions
+- `openapi.json` — public API contract
+- Any other `.md` files in the repository
+
+Specifically, these changes require a documentation sweep:
 - New or changed API endpoints, parameters, or responses
 - New or changed business rules and edge cases
-- New or changed CLI flags or behavior
+- New or changed CLI flags, arguments, or behavior
 - New or changed frontend pages, routes, or UI behavior
 - Changes to the project structure (new files/packages)
+- Changes to build, test, or deployment procedures
+
+**How to check:** Before committing, scan every documentation file listed above
+for references to the changed functionality (CLI flags, endpoint paths, example
+commands, etc.) and update any that are stale. Do not assume only `SPEC.md`
+needs updating — `README.md` and other docs often duplicate information like
+usage examples and must stay in sync.
 
 **API spec rule:** Any change to API endpoints (new endpoints, changed
 request/response schemas, changed parameters, changed auth requirements) must
