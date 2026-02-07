@@ -125,9 +125,9 @@ Flags:
 	}
 	defer database.Close()
 
-	// Run migrations (idempotent).
-	if err := db.Migrate(database); err != nil {
-		slog.Error("failed to migrate database", "error", err)
+	// Ensure schema exists (idempotent).
+	if err := db.EnsureSchema(database); err != nil {
+		slog.Error("failed to ensure database schema", "error", err)
 		os.Exit(1)
 	}
 
@@ -185,17 +185,17 @@ Flags:
 	slog.Info("server stopped, closing database")
 }
 
-// initDatabase creates a new database, runs migrations, and creates the admin user.
+// initDatabase creates a new database, ensures the schema, and creates the admin user.
 func initDatabase(path, adminUsername string) (*sql.DB, string, error) {
 	database, err := db.Open(path)
 	if err != nil {
 		return nil, "", fmt.Errorf("opening database: %w", err)
 	}
 
-	if err := db.Migrate(database); err != nil {
+	if err := db.EnsureSchema(database); err != nil {
 		database.Close()
 		os.Remove(path)
-		return nil, "", fmt.Errorf("running migrations: %w", err)
+		return nil, "", fmt.Errorf("ensuring schema: %w", err)
 	}
 
 	password, err := generatePassword(16)

@@ -63,11 +63,11 @@ CREATE TABLE IF NOT EXISTS transfers (
 );
 `
 
-// Migrate runs the database schema migrations.
-func Migrate(db *sql.DB) error {
+// EnsureSchema creates all tables and indexes if they don't already exist.
+func EnsureSchema(db *sql.DB) error {
 	_, err := db.Exec(schema)
 	if err != nil {
-		return fmt.Errorf("running migrations: %w", err)
+		return fmt.Errorf("creating schema: %w", err)
 	}
 	return nil
 }

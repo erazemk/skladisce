@@ -14,7 +14,7 @@ func TestGetJWTSecret_GeneratesAndPersists(t *testing.T) {
 	}
 	defer database.Close()
 
-	if err := db.Migrate(database); err != nil {
+	if err := db.EnsureSchema(database); err != nil {
 		t.Fatal(err)
 	}
 
