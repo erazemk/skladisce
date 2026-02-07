@@ -32,7 +32,8 @@ printed to stdout. Save the password — it cannot be recovered.
 |-------|------------|----------------------|------------------------------------|
 | `-d`  | `-db`      | `skladisce.sqlite3`  | SQLite database path               |
 | `-a`  | `-addr`    | `:8080`              | Listen address (host:port)         |
-| `-u`  | `-user`| `Admin`              | Admin username on first run        |
+| `-u`  | `-user`    | `Admin`              | Admin username on first run        |
+| `-l`  | `-log`     |                      | Log file path (stdout/stderr only by default) |
 | `-h`  | `-help`    |                      | Show help and exit                 |
 
 ## Development

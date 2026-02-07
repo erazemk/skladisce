@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -53,13 +54,33 @@ func (lr *levelRouter) WithGroup(name string) slog.Handler {
 	}
 }
 
-func setupLogger() {
+// setupLogger configures structured logging. INFO/WARN go to stdout, ERROR goes
+// to stderr. If logPath is non-empty, all levels are also written to that file.
+// Returns a cleanup function that closes the log file (if opened).
+func setupLogger(logPath string) (func(), error) {
 	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+
+	var cleanup func()
+
+	stdoutW := io.Writer(os.Stdout)
+	stderrW := io.Writer(os.Stderr)
+
+	if logPath != "" {
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("opening log file: %w", err)
+		}
+		cleanup = func() { f.Close() }
+		stdoutW = io.MultiWriter(os.Stdout, f)
+		stderrW = io.MultiWriter(os.Stderr, f)
+	}
+
 	handler := &levelRouter{
-		stdout: slog.NewTextHandler(os.Stdout, opts),
-		stderr: slog.NewTextHandler(os.Stderr, opts),
+		stdout: slog.NewTextHandler(stdoutW, opts),
+		stderr: slog.NewTextHandler(stderrW, opts),
 	}
 	slog.SetDefault(slog.New(handler))
+	return cleanup, nil
 }
 
 func main() {
@@ -77,6 +98,10 @@ func main() {
 	fs.StringVar(&adminUser, "user", "Admin", "")
 	fs.StringVar(&adminUser, "u", "Admin", "")
 
+	var logPath string
+	fs.StringVar(&logPath, "log", "", "")
+	fs.StringVar(&logPath, "l", "", "")
+
 	fs.Usage = func() {
 		fmt.Fprint(os.Stdout, `Usage: skladisce [flags]
 
@@ -84,6 +109,7 @@ Flags:
   -d, -db <path>          SQLite database path (default: skladisce.sqlite3)
   -a, -addr <host:port>   listen address (default: :8080)
   -u, -user <name>        admin username on first run (default: Admin)
+  -l, -log <path>         log file path (default: no file, stdout/stderr only)
   -h, -help               show this help and exit
 `)
 	}
@@ -102,7 +128,15 @@ Flags:
 	}
 
 	// Set up structured logging: INFO/WARN → stdout, ERROR → stderr.
-	setupLogger()
+	// Optionally also write to a log file.
+	closeLog, err := setupLogger(logPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	if closeLog != nil {
+		defer closeLog()
+	}
 
 	// Check if DB exists, auto-init if not.
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {

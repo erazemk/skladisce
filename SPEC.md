@@ -129,7 +129,7 @@ file exists at the specified path, it automatically initializes one (creates the
 schema and generates an admin account with a random password).
 
 ```
-$ skladisce -db data/skladisce.sqlite3 -a :8080
+$ skladisce -db data/skladisce.sqlite3 -a :8080 -l /var/log/skladisce.log
 
 # If DB doesn't exist (first run):
 Database created: data/skladisce.sqlite3
@@ -150,6 +150,8 @@ Server listening on :8080
 - `-d`, `-db <path>` — SQLite database path (default: `skladisce.sqlite3`)
 - `-a`, `-addr <host:port>` — listen address (default: `:8080`)
 - `-u`, `-user <name>` — admin username on first run (default: `Admin`)
+- `-l`, `-log <path>` — log file path; when set, all log output is written to
+  this file in addition to stdout/stderr (default: no file)
 - `-h`, `-help` — show usage and exit with code 0
 - Invalid flags print usage to stderr and exit with code 1
 
@@ -163,7 +165,7 @@ Server listening on :8080
 - Request logging: structured via `slog` with fields `method`, `path`, `status`,
   `duration`. Log level varies by status: INFO for 2xx/3xx, WARN for 4xx,
   ERROR for 5xx. INFO/WARN go to stdout, ERROR goes to stderr (gokrazy
-  compatible — no log files).
+  compatible). When `-log` is set, all levels are also appended to the log file.
 
 ## API Endpoints
 
