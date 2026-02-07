@@ -42,12 +42,12 @@ func GetUser(ctx context.Context, db *sql.DB, id int64) (*model.User, error) {
 	return u, nil
 }
 
-// GetUserByUsername returns a user by username (including soft-deleted for auth checks).
+// GetUserByUsername returns an active (non-deleted) user by username.
 func GetUserByUsername(ctx context.Context, db *sql.DB, username string) (*model.User, error) {
 	u := &model.User{}
 	err := db.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, role, created_at, deleted_at
-		 FROM users WHERE username = ?`, username,
+		 FROM users WHERE username = ? AND deleted_at IS NULL`, username,
 	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.DeletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil

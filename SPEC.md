@@ -41,12 +41,16 @@ There is no separate borrow/return logic — it's all transfers.
 -- Registration is disabled; only admins can create users via POST /api/users.
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY,
-    username      TEXT UNIQUE NOT NULL,
+    username      TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at    DATETIME
 );
+
+-- Usernames must be unique among active (non-deleted) users.
+-- Soft-deleted usernames can be reused.
+CREATE UNIQUE INDEX idx_users_username_active ON users(username) WHERE deleted_at IS NULL;
 
 -- Unified: people and storage locations
 CREATE TABLE owners (

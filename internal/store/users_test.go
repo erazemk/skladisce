@@ -87,6 +87,40 @@ func TestDeleteUser(t *testing.T) {
 	}
 }
 
+func TestDeleteUserAndRecreateWithSameName(t *testing.T) {
+	database := db.NewTestDB(t)
+	ctx := context.Background()
+
+	user, err := CreateUser(ctx, database, "reusable", "hash1", model.RoleUser)
+	if err != nil {
+		t.Fatalf("first CreateUser: %v", err)
+	}
+	if err := DeleteUser(ctx, database, user.ID); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+
+	// Creating a new user with the same username should succeed.
+	user2, err := CreateUser(ctx, database, "reusable", "hash2", model.RoleManager)
+	if err != nil {
+		t.Fatalf("second CreateUser with same username should succeed: %v", err)
+	}
+	if user2.Role != model.RoleManager {
+		t.Errorf("expected role 'manager', got %q", user2.Role)
+	}
+
+	// GetUserByUsername should return the new active user, not the deleted one.
+	got, err := GetUserByUsername(ctx, database, "reusable")
+	if err != nil {
+		t.Fatalf("GetUserByUsername: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected active user, got nil")
+	}
+	if got.ID != user2.ID {
+		t.Errorf("expected user ID %d, got %d", user2.ID, got.ID)
+	}
+}
+
 func TestUpdateUserPassword(t *testing.T) {
 	database := db.NewTestDB(t)
 	ctx := context.Background()
