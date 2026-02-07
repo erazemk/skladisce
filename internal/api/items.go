@@ -3,11 +3,11 @@ package api
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/erazemk/skladisce/internal/imaging"
 	"github.com/erazemk/skladisce/internal/model"
 	"github.com/erazemk/skladisce/internal/store"
 )
@@ -33,6 +33,7 @@ func (h *ItemsHandler) List(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	items, err := store.ListItems(r.Context(), h.DB, status)
 	if err != nil {
+		slog.Error("failed to list items", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to list items")
 		return
 	}
@@ -57,6 +58,7 @@ func (h *ItemsHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	item, err := store.CreateItem(r.Context(), h.DB, req.Name, req.Description)
 	if err != nil {
+		slog.Error("failed to create item", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to create item")
 		return
 	}
@@ -76,6 +78,7 @@ func (h *ItemsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	item, err := store.GetItem(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get item", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get item")
 		return
 	}
@@ -87,6 +90,7 @@ func (h *ItemsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Get distribution as well.
 	dist, err := store.GetItemDistribution(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get item distribution", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get item distribution")
 		return
 	}
@@ -128,6 +132,7 @@ func (h *ItemsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.UpdateItem(r.Context(), h.DB, id, req.Name, req.Description, req.Status); err != nil {
+		slog.Error("failed to update item", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to update item")
 		return
 	}
@@ -153,7 +158,8 @@ func (h *ItemsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.DeleteItem(r.Context(), h.DB, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete item")
+		slog.Error("failed to delete item", "error", err)
+		jsonError(w, http.StatusNotFound, "item not found")
 		return
 	}
 
@@ -178,27 +184,22 @@ func (h *ItemsHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, header, err := r.FormFile("image")
+	file, _, err := r.FormFile("image")
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, "image file required")
 		return
 	}
 	defer file.Close()
 
-	// Validate MIME type.
-	mime := header.Header.Get("Content-Type")
-	if mime != "image/jpeg" && mime != "image/png" && mime != "image/webp" {
-		jsonError(w, http.StatusBadRequest, "image must be JPEG, PNG, or WebP")
-		return
-	}
-
-	data, err := io.ReadAll(file)
+	// Process the image: validate format by sniffing bytes, downscale, compress.
+	result, err := imaging.Process(file)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to read image")
+		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if err := store.SetItemImage(r.Context(), h.DB, id, data, mime); err != nil {
+	if err := store.SetItemImage(r.Context(), h.DB, id, result.Data, result.MIME); err != nil {
+		slog.Error("failed to save image", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to save image")
 		return
 	}
@@ -223,6 +224,7 @@ func (h *ItemsHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 
 	data, mime, err := store.GetItemImage(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get image", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get image")
 		return
 	}
@@ -232,8 +234,12 @@ func (h *ItemsHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		slog.Error("failed to write image response", "error", err)
+	}
 }
 
 // GetHistory handles GET /api/items/{id}/history.
@@ -246,6 +252,7 @@ func (h *ItemsHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 
 	history, err := store.GetItemHistory(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get item history", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get item history")
 		return
 	}

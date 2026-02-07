@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // User represents an authentication user (separate from owners).
 type User struct {
@@ -19,12 +22,35 @@ const (
 	RoleUser    = "user"
 )
 
+// roleLevels maps roles to their privilege level. Unknown roles have level 0.
+var roleLevels = map[string]int{
+	RoleAdmin:   3,
+	RoleManager: 2,
+	RoleUser:    1,
+}
+
 // RoleAtLeast checks if role meets or exceeds the minimum required role.
+// Returns false for any unknown role (fail-closed).
 func RoleAtLeast(role, minimum string) bool {
-	levels := map[string]int{
-		RoleAdmin:   3,
-		RoleManager: 2,
-		RoleUser:    1,
+	roleLevel, roleOK := roleLevels[role]
+	minLevel, minOK := roleLevels[minimum]
+	if !roleOK || !minOK {
+		return false
 	}
-	return levels[role] >= levels[minimum]
+	return roleLevel >= minLevel
+}
+
+// MinPasswordLength is the minimum allowed password length.
+const MinPasswordLength = 8
+
+// ValidatePassword checks that a password meets minimum requirements.
+func ValidatePassword(password string) error {
+	if len(password) < MinPasswordLength {
+		return fmt.Errorf("password must be at least %d characters", MinPasswordLength)
+	}
+	// bcrypt silently truncates at 72 bytes.
+	if len([]byte(password)) > 72 {
+		return fmt.Errorf("password must not exceed 72 bytes")
+	}
+	return nil
 }

@@ -30,6 +30,7 @@ func (h *OwnersHandler) List(w http.ResponseWriter, r *http.Request) {
 	ownerType := r.URL.Query().Get("type")
 	owners, err := store.ListOwners(r.Context(), h.DB, ownerType)
 	if err != nil {
+		slog.Error("failed to list owners", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to list owners")
 		return
 	}
@@ -59,6 +60,7 @@ func (h *OwnersHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	owner, err := store.CreateOwner(r.Context(), h.DB, req.Name, req.Type)
 	if err != nil {
+		slog.Error("failed to create owner", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to create owner")
 		return
 	}
@@ -78,6 +80,7 @@ func (h *OwnersHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	owner, err := store.GetOwner(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get owner", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get owner")
 		return
 	}
@@ -109,6 +112,7 @@ func (h *OwnersHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.UpdateOwner(r.Context(), h.DB, id, req.Name); err != nil {
+		slog.Error("failed to update owner", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to update owner")
 		return
 	}
@@ -134,7 +138,9 @@ func (h *OwnersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.DeleteOwner(r.Context(), h.DB, id); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		// Check if it's a business rule error (holding inventory) vs internal error.
+		slog.Warn("failed to delete owner", "owner", ownerName, "error", err)
+		jsonError(w, http.StatusBadRequest, "cannot delete owner: still holds inventory or not found")
 		return
 	}
 
@@ -153,6 +159,7 @@ func (h *OwnersHandler) GetInventory(w http.ResponseWriter, r *http.Request) {
 
 	inventory, err := store.GetOwnerInventory(r.Context(), h.DB, id)
 	if err != nil {
+		slog.Error("failed to get owner inventory", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to get owner inventory")
 		return
 	}

@@ -18,7 +18,7 @@ func NewRouter(db *sql.DB, jwtSecret string) http.Handler {
 	transfersHandler := &TransfersHandler{DB: db}
 	inventoryHandler := &InventoryHandler{DB: db}
 
-	authMW := AuthMiddleware(jwtSecret)
+	authMW := AuthMiddleware(jwtSecret, db)
 	requireAdmin := RequireRole(model.RoleAdmin)
 	requireManager := RequireRole(model.RoleManager)
 
@@ -27,6 +27,7 @@ func NewRouter(db *sql.DB, jwtSecret string) http.Handler {
 
 	// Authenticated routes.
 	mux.Handle("PUT /api/auth/password", authMW(http.HandlerFunc(authHandler.ChangePassword)))
+	mux.Handle("POST /api/auth/logout", authMW(http.HandlerFunc(authHandler.Logout)))
 
 	// Users (admin only).
 	mux.Handle("GET /api/users", authMW(requireAdmin(http.HandlerFunc(usersHandler.List))))

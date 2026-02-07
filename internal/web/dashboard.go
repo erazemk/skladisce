@@ -1,6 +1,7 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/erazemk/skladisce/internal/store"
@@ -10,8 +11,14 @@ import (
 func (s *Server) Dashboard(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
 
-	inventory, _ := store.ListInventory(r.Context(), s.DB)
-	transfers, _ := store.ListTransfers(r.Context(), s.DB, 0, 0)
+	inventory, err := store.ListInventory(r.Context(), s.DB)
+	if err != nil {
+		slog.Error("failed to list inventory for dashboard", "error", err)
+	}
+	transfers, err := store.ListTransfers(r.Context(), s.DB, 0, 0)
+	if err != nil {
+		slog.Error("failed to list transfers for dashboard", "error", err)
+	}
 
 	// Limit recent transfers to 10.
 	if len(transfers) > 10 {

@@ -2,8 +2,11 @@ package web
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
+	"strconv"
 
+	"github.com/erazemk/skladisce/internal/store"
 	webembed "github.com/erazemk/skladisce/web"
 )
 
@@ -21,7 +24,7 @@ func NewRouter(db *sql.DB, jwtSecret string) (http.Handler, error) {
 	}
 
 	mux := http.NewServeMux()
-	cookieAuth := CookieAuthMiddleware(jwtSecret)
+	cookieAuth := CookieAuthMiddleware(jwtSecret, db)
 
 	// Static assets.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(webembed.StaticFS()))))
@@ -40,6 +43,7 @@ func NewRouter(db *sql.DB, jwtSecret string) (http.Handler, error) {
 	mux.Handle("POST /items/{id}", cookieAuth(http.HandlerFunc(s.ItemUpdateSubmit)))
 	mux.Handle("POST /items/{id}/stock", cookieAuth(http.HandlerFunc(s.ItemStockSubmit)))
 	mux.Handle("POST /items/{id}/image", cookieAuth(http.HandlerFunc(s.ItemImageSubmit)))
+	mux.Handle("GET /items/{id}/image", cookieAuth(http.HandlerFunc(s.ItemImageGet)))
 
 	mux.Handle("GET /owners", cookieAuth(http.HandlerFunc(s.OwnersPage)))
 	mux.Handle("POST /owners", cookieAuth(http.HandlerFunc(s.OwnerCreateSubmit)))
@@ -59,4 +63,32 @@ func NewRouter(db *sql.DB, jwtSecret string) (http.Handler, error) {
 	mux.Handle("POST /settings", cookieAuth(http.HandlerFunc(s.SettingsSubmit)))
 
 	return mux, nil
+}
+
+// ItemImageGet handles GET /items/{id}/image (web route, cookie-authenticated).
+func (s *Server) ItemImageGet(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	data, mime, err := store.GetItemImage(r.Context(), s.DB, id)
+	if err != nil {
+		slog.Error("failed to get image", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if data == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if _, err := w.Write(data); err != nil {
+		slog.Error("failed to write image response", "error", err)
+	}
 }

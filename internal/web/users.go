@@ -20,7 +20,10 @@ func (s *Server) UsersPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, _ := store.ListUsers(r.Context(), s.DB)
+	users, err := store.ListUsers(r.Context(), s.DB)
+	if err != nil {
+		slog.Error("failed to list users", "error", err)
+	}
 
 	s.Templates.Render(w, "users.html", &struct {
 		PageData
@@ -48,14 +51,30 @@ func (s *Server) UserCreateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := model.ValidatePassword(password); err != nil {
+		users, _ := store.ListUsers(r.Context(), s.DB)
+		s.Templates.Render(w, "users.html", &struct {
+			PageData
+			Users []model.User
+		}{
+			PageData: PageData{Title: "Uporabniki", User: claims, Token: GetWebToken(r.Context()), Error: fmt.Sprintf("Geslo: %s", err.Error())},
+			Users:    users,
+		})
+		return
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("failed to hash password", "error", err)
 		http.Error(w, "failed to hash password", http.StatusInternalServerError)
 		return
 	}
 
-	store.CreateUser(r.Context(), s.DB, username, string(hash), role)
-	slog.Info("user created", "user", claims.Username, "new_user", username, "role", role)
+	if _, err := store.CreateUser(r.Context(), s.DB, username, string(hash), role); err != nil {
+		slog.Error("failed to create user", "error", err)
+	} else {
+		slog.Info("user created", "user", claims.Username, "new_user", username, "role", role)
+	}
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
@@ -79,13 +98,22 @@ func (s *Server) UserResetPasswordSubmit(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if err := model.ValidatePassword(newPassword); err != nil {
+		// Redirect back; password too short.
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("failed to hash password", "error", err)
 		http.Error(w, "failed to hash password", http.StatusInternalServerError)
 		return
 	}
 
-	store.UpdateUserPassword(r.Context(), s.DB, id, string(hash))
+	if err := store.UpdateUserPassword(r.Context(), s.DB, id, string(hash)); err != nil {
+		slog.Error("failed to reset password", "error", err)
+	}
 
 	target, _ := store.GetUser(r.Context(), s.DB, id)
 	targetName := fmt.Sprintf("id:%d", id)
@@ -163,8 +191,19 @@ func (s *Server) SettingsSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := model.ValidatePassword(newPassword); err != nil {
+		s.Templates.Render(w, "settings.html", &PageData{
+			Title: "Nastavitve",
+			User:  claims,
+			Token: GetWebToken(r.Context()),
+			Error: "Novo geslo mora imeti vsaj 8 znakov.",
+		})
+		return
+	}
+
 	user, err := store.GetUser(r.Context(), s.DB, claims.UserID)
 	if err != nil || user == nil {
+		slog.Error("failed to get user for password change", "error", err)
 		s.Templates.Render(w, "settings.html", &PageData{
 			Title: "Nastavitve",
 			User:  claims,
@@ -186,6 +225,7 @@ func (s *Server) SettingsSubmit(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("failed to hash new password", "error", err)
 		s.Templates.Render(w, "settings.html", &PageData{
 			Title: "Nastavitve",
 			User:  claims,
@@ -196,6 +236,7 @@ func (s *Server) SettingsSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.UpdateUserPassword(r.Context(), s.DB, claims.UserID, string(hash)); err != nil {
+		slog.Error("failed to update password", "error", err)
 		s.Templates.Render(w, "settings.html", &PageData{
 			Title: "Nastavitve",
 			User:  claims,

@@ -55,13 +55,14 @@ func (s *Server) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cookie MaxAge matches JWT TokenExpiry (7 days).
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   86400, // 24 hours
+		MaxAge:   int(auth.TokenExpiry.Seconds()),
 	})
 
 	slog.Info("user logged in", "user", user.Username, "role", user.Role)
@@ -69,13 +70,21 @@ func (s *Server) LoginSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles POST /logout.
+// Revokes the token so it cannot be reused, then clears the cookie.
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
+	// Try to revoke the token if we can parse it.
+	if cookie, err := r.Cookie("token"); err == nil && cookie.Value != "" {
+		if claims, err := auth.ValidateToken(s.JWTSecret, cookie.Value); err == nil {
+			if claims.ID != "" && claims.ExpiresAt != nil {
+				if err := store.RevokeToken(r.Context(), s.DB, claims.ID, claims.ExpiresAt.Time); err != nil {
+					slog.Error("failed to revoke token on logout", "error", err)
+				} else {
+					slog.Info("user logged out", "user", claims.Username)
+				}
+			}
+		}
+	}
+
+	clearAuthCookie(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }

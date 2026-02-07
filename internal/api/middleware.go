@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -9,14 +10,17 @@ import (
 
 	"github.com/erazemk/skladisce/internal/auth"
 	"github.com/erazemk/skladisce/internal/model"
+	"github.com/erazemk/skladisce/internal/store"
 )
 
 type contextKey string
 
 const claimsKey contextKey = "claims"
+const tokenKey contextKey = "rawtoken"
 
-// AuthMiddleware validates JWT from Authorization header and adds claims to context.
-func AuthMiddleware(secret string) func(http.Handler) http.Handler {
+// AuthMiddleware validates JWT from Authorization header, checks token
+// revocation, and adds claims + raw token to context.
+func AuthMiddleware(secret string, db *sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -32,7 +36,22 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Check if the token has been revoked.
+			if claims.ID != "" {
+				revoked, err := store.IsTokenRevoked(r.Context(), db, claims.ID)
+				if err != nil {
+					slog.Error("failed to check token revocation", "error", err)
+					jsonError(w, http.StatusInternalServerError, "internal error")
+					return
+				}
+				if revoked {
+					jsonError(w, http.StatusUnauthorized, "token has been revoked")
+					return
+				}
+			}
+
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
+			ctx = context.WithValue(ctx, tokenKey, tokenStr)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -60,6 +79,12 @@ func RequireRole(minimum string) func(http.Handler) http.Handler {
 func GetClaims(ctx context.Context) *auth.Claims {
 	claims, _ := ctx.Value(claimsKey).(*auth.Claims)
 	return claims
+}
+
+// GetRawToken retrieves the raw JWT token from the context.
+func GetRawToken(ctx context.Context) string {
+	token, _ := ctx.Value(tokenKey).(string)
+	return token
 }
 
 // statusRecorder wraps http.ResponseWriter to capture the status code.

@@ -48,11 +48,11 @@
 <div class="card mb-2">
     <h2>Slika</h2>
     {{if .Item.ImageMime}}
-    <p><img src="/api/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
+    <p><img src="/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
     {{end}}
     <form method="POST" action="/items/{{.Item.ID}}/image" enctype="multipart/form-data" class="mt-1">
         <div class="form-group">
-            <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+            <input type="file" name="image" accept="image/jpeg,image/png" required>
         </div>
         <button type="submit" class="btn btn-secondary btn-sm">Naloži sliko</button>
     </form>
@@ -60,7 +60,7 @@
 {{else if .Item.ImageMime}}
 <div class="card mb-2">
     <h2>Slika</h2>
-    <p><img src="/api/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
+    <p><img src="/items/{{.Item.ID}}/image" style="max-width:300px; border-radius: var(--radius);" alt="{{.Item.Name}}"></p>
 </div>
 {{end}}
 

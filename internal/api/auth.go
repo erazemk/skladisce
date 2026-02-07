@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/erazemk/skladisce/internal/auth"
+	"github.com/erazemk/skladisce/internal/model"
 	"github.com/erazemk/skladisce/internal/store"
 )
 
@@ -89,6 +90,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := model.ValidatePassword(req.NewPassword); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	user, err := store.GetUser(r.Context(), h.DB, claims.UserID)
 	if err != nil || user == nil {
 		jsonError(w, http.StatusInternalServerError, "internal error")
@@ -113,4 +119,25 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("user changed own password", "user", claims.Username)
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "password updated"})
+}
+
+// Logout handles POST /api/auth/logout.
+// Revokes the current token so it cannot be reused.
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	claims := GetClaims(r.Context())
+	if claims == nil {
+		jsonError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	if claims.ID != "" && claims.ExpiresAt != nil {
+		if err := store.RevokeToken(r.Context(), h.DB, claims.ID, claims.ExpiresAt.Time); err != nil {
+			slog.Error("failed to revoke token", "error", err)
+			jsonError(w, http.StatusInternalServerError, "failed to revoke token")
+			return
+		}
+	}
+
+	slog.Info("user logged out (API)", "user", claims.Username)
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "logged out"})
 }

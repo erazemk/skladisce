@@ -94,13 +94,21 @@ func UpdateItem(ctx context.Context, db *sql.DB, id int64, name, description, st
 }
 
 // DeleteItem soft-deletes an item.
+// Returns an error if the item does not exist or is already deleted.
 func DeleteItem(ctx context.Context, db *sql.DB, id int64) error {
-	_, err := db.ExecContext(ctx,
+	result, err := db.ExecContext(ctx,
 		`UPDATE items SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`,
 		id,
 	)
 	if err != nil {
 		return fmt.Errorf("deleting item: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("deleting item: item not found")
 	}
 	return nil
 }

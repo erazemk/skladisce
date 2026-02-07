@@ -29,6 +29,7 @@ There is no separate borrow/return logic — it's all transfers.
 | Router            | `net/http` (Go 1.22+ ServeMux) | Pattern matching built-in, zero deps |
 | Auth              | JWT (`golang-jwt/jwt/v5`)      | Stateless, simple                    |
 | Password hashing  | `golang.org/x/crypto/bcrypt`   | Standard, battle-tested              |
+| Image processing  | `golang.org/x/image/draw`      | Pure Go, high-quality resizing       |
 | Frontend          | Go templates + htmx            | Server-rendered, ~14 KB JS, no build step |
 | Static embedding  | `go:embed`                     | Single binary, no external files     |
 | Build             | `CGO_ENABLED=0 go build`       | Static binary                        |
@@ -98,6 +99,12 @@ CREATE TABLE transfers (
 CREATE TABLE settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
+);
+
+-- Revoked JWT tokens (for logout/token invalidation)
+CREATE TABLE revoked_tokens (
+    jti        TEXT PRIMARY KEY,
+    expires_at DATETIME NOT NULL
 );
 ```
 
@@ -174,6 +181,7 @@ Server listening on :8080
 ```
 POST   /api/auth/login             — authenticate, get JWT token
 PUT    /api/auth/password           — change own password (requires current password) [all roles]
+POST   /api/auth/logout             — revoke current token [all roles]
 ```
 
 ### Users (admin only)
@@ -261,14 +269,18 @@ skladisce/
 │   │   ├── owners.go            — owner DB queries
 │   │   ├── items.go             — item DB queries
 │   │   ├── transfers.go         — transfer + inventory queries (transactional)
-│   │   └── inventory.go         — inventory queries
+│   │   ├── inventory.go         — inventory queries
+│   │   ├── tokens.go            — token revocation queries
+│   │   └── settings.go          — application settings queries
 │   ├── model/
 │   │   ├── user.go
 │   │   ├── owner.go
 │   │   ├── item.go
 │   │   └── transfer.go
 │   └── auth/
-│       └── jwt.go               — token generation/validation
+│       └── jwt.go               — token generation/validation (with JTI)
+│   ├── imaging/
+│   │   └── imaging.go           — image validation, downscaling, compression
 ├── web/
 │   ├── static/
 │   │   ├── htmx.min.js          — vendored htmx (~14 KB gzipped)
@@ -307,7 +319,7 @@ skladisce/
 | First user creation            | No open registration; first run auto-generates admin credentials      |
 | DB already exists              | Auto-migrates schema if needed, then starts server                    |
 | DB missing on serve            | Auto-runs init (create DB + schema + admin), then starts server       |
-| Image upload                   | Validate MIME type (jpg/png/webp), enforce size limit (~5 MB)         |
+| Image upload                   | Validate format by sniffing bytes (jpg/png only), enforce 5 MB limit, downscale to 1024×1024 max, re-encode as JPEG |
 | Quantity goes to 0             | Delete the `inventory` row (constraint: `quantity > 0`)               |
 | Adjust for lost items          | Manager uses `/inventory/adjust` with negative delta + notes          |
 | Add stock to any owner         | `/inventory/stock` works for both locations and people (for pre-existing holdings) |
@@ -322,6 +334,10 @@ skladisce/
 - **JWT secret** is stored in the `settings` table in the database. It is
   auto-generated on first startup and persists across restarts.
 - **Token expiry** is 7 days. Users must re-login after that.
+- **Token revocation**: each JWT includes a unique `jti` (JWT ID). On logout,
+  the `jti` is added to the `revoked_tokens` table. Auth middleware checks this
+  table on every request. Expired revocation entries are cleaned up lazily.
+- **Password requirements**: minimum 8 characters, maximum 72 bytes (bcrypt limit).
 
 ### JSON API (`/api/*`)
 

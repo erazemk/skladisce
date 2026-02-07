@@ -201,7 +201,7 @@ func TestAdminResetPassword(t *testing.T) {
 	// Create a regular user.
 	req, _ := authRequest("POST", server.URL+"/api/users", token, map[string]any{
 		"username": "user2",
-		"password": "oldpass",
+		"password": "oldpass123",
 		"role":     "user",
 	})
 	resp, _ := http.DefaultClient.Do(req)
@@ -233,10 +233,66 @@ func TestAdminResetPassword(t *testing.T) {
 	resp.Body.Close()
 
 	// Verify login with old password fails.
-	loginBody, _ = json.Marshal(map[string]string{"username": "user2", "password": "oldpass"})
+	loginBody, _ = json.Marshal(map[string]string{"username": "user2", "password": "oldpass123"})
 	resp, _ = http.Post(server.URL+"/api/auth/login", "application/json", bytes.NewReader(loginBody))
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401 login with old password, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestLogoutRevokesToken(t *testing.T) {
+	server, token := setupTestServer(t)
+
+	// Token should work before logout.
+	req, _ := authRequest("GET", server.URL+"/api/items", token, nil)
+	resp, _ := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 before logout, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Logout.
+	req, _ = authRequest("POST", server.URL+"/api/auth/logout", token, nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for logout, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Token should be revoked after logout.
+	req, _ = authRequest("GET", server.URL+"/api/items", token, nil)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 after logout, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestPasswordMinLength(t *testing.T) {
+	server, token := setupTestServer(t)
+
+	// Try to create user with short password.
+	req, _ := authRequest("POST", server.URL+"/api/users", token, map[string]any{
+		"username": "shortpw",
+		"password": "short",
+		"role":     "user",
+	})
+	resp, _ := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for short password, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Create with valid password should work.
+	req, _ = authRequest("POST", server.URL+"/api/users", token, map[string]any{
+		"username": "validpw",
+		"password": "validpassword",
+		"role":     "user",
+	})
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected 201 for valid password, got %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 }

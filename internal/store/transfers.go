@@ -8,6 +8,24 @@ import (
 	"github.com/erazemk/skladisce/internal/model"
 )
 
+// beginImmediate starts a transaction with BEGIN IMMEDIATE semantics.
+// This prevents SQLITE_BUSY errors by acquiring a write lock immediately.
+func beginImmediate(ctx context.Context, db *sql.DB) (*sql.Tx, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("beginning transaction: %w", err)
+	}
+	// Upgrade to immediate by executing a write statement.
+	// The INSERT OR IGNORE into a non-existent key is a no-op write that
+	// acquires the reserved lock.
+	if _, err := tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO settings (key, value) VALUES ('_lock', '')`); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("acquiring write lock: %w", err)
+	}
+	return tx, nil
+}
+
 // CreateTransfer creates a transfer, updating inventory in a single transaction.
 // Uses BEGIN IMMEDIATE to prevent concurrent modification issues.
 func CreateTransfer(ctx context.Context, db *sql.DB, itemID, fromOwnerID, toOwnerID int64, quantity int, notes string, transferredBy *int64) (*model.Transfer, error) {
@@ -18,16 +36,11 @@ func CreateTransfer(ctx context.Context, db *sql.DB, itemID, fromOwnerID, toOwne
 		return nil, fmt.Errorf("quantity must be positive")
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := beginImmediate(ctx, db)
 	if err != nil {
-		return nil, fmt.Errorf("beginning transaction: %w", err)
+		return nil, err
 	}
 	defer tx.Rollback()
-
-	// Use BEGIN IMMEDIATE semantics by acquiring a write lock early.
-	if _, err := tx.ExecContext(ctx, "SELECT 1"); err != nil {
-		return nil, fmt.Errorf("acquiring lock: %w", err)
-	}
 
 	// Check available quantity.
 	var available int
@@ -82,11 +95,15 @@ func CreateTransfer(ctx context.Context, db *sql.DB, itemID, fromOwnerID, toOwne
 		return nil, fmt.Errorf("recording transfer: %w", err)
 	}
 
+	transferID, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("getting transfer id: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing transfer: %w", err)
 	}
 
-	transferID, _ := result.LastInsertId()
 	return GetTransfer(ctx, db, transferID)
 }
 
@@ -137,7 +154,7 @@ func ListTransfers(ctx context.Context, db *sql.DB, itemID, ownerID int64) ([]mo
 		args = append(args, ownerID, ownerID)
 	}
 
-	query += ` ORDER BY t.transferred_at DESC`
+	query += ` ORDER BY t.transferred_at DESC LIMIT 500`
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

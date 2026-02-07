@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS transfers (
     transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     transferred_by INTEGER REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    jti        TEXT PRIMARY KEY,
+    expires_at DATETIME NOT NULL
+);
 `
 
 // EnsureSchema creates all tables and indexes if they don't already exist.

@@ -12,7 +12,10 @@ import (
 // TransfersPage handles GET /transfers.
 func (s *Server) TransfersPage(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
-	transfers, _ := store.ListTransfers(r.Context(), s.DB, 0, 0)
+	transfers, err := store.ListTransfers(r.Context(), s.DB, 0, 0)
+	if err != nil {
+		slog.Error("failed to list transfers", "error", err)
+	}
 
 	s.Templates.Render(w, "transfers.html", &struct {
 		PageData
@@ -26,8 +29,14 @@ func (s *Server) TransfersPage(w http.ResponseWriter, r *http.Request) {
 // TransferNewPage handles GET /transfers/new.
 func (s *Server) TransferNewPage(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
-	items, _ := store.ListItems(r.Context(), s.DB, "")
-	owners, _ := store.ListOwners(r.Context(), s.DB, "")
+	items, err := store.ListItems(r.Context(), s.DB, "")
+	if err != nil {
+		slog.Error("failed to list items for transfer form", "error", err)
+	}
+	owners, err := store.ListOwners(r.Context(), s.DB, "")
+	if err != nil {
+		slog.Error("failed to list owners for transfer form", "error", err)
+	}
 
 	s.Templates.Render(w, "transfer_new.html", &struct {
 		PageData
@@ -54,15 +63,22 @@ func (s *Server) TransferCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	transfer, err := store.CreateTransfer(r.Context(), s.DB, itemID, fromOwnerID, toOwnerID, quantity, notes, &userID)
 
 	if err != nil {
-		items, _ := store.ListItems(r.Context(), s.DB, "")
-		owners, _ := store.ListOwners(r.Context(), s.DB, "")
+		slog.Warn("transfer creation failed", "error", err, "user", claims.Username)
+		items, err2 := store.ListItems(r.Context(), s.DB, "")
+		if err2 != nil {
+			slog.Error("failed to list items for transfer error page", "error", err2)
+		}
+		owners, err2 := store.ListOwners(r.Context(), s.DB, "")
+		if err2 != nil {
+			slog.Error("failed to list owners for transfer error page", "error", err2)
+		}
 
 		s.Templates.Render(w, "transfer_new.html", &struct {
 			PageData
 			Items  []model.Item
 			Owners []model.Owner
 		}{
-			PageData: PageData{Title: "Nov prenos", User: claims, Token: GetWebToken(r.Context()), Error: err.Error()},
+			PageData: PageData{Title: "Nov prenos", User: claims, Token: GetWebToken(r.Context()), Error: "Prenos ni uspel. Preverite količino in lastnika."},
 			Items:    items,
 			Owners:   owners,
 		})

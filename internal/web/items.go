@@ -2,11 +2,11 @@ package web
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/erazemk/skladisce/internal/imaging"
 	"github.com/erazemk/skladisce/internal/model"
 	"github.com/erazemk/skladisce/internal/store"
 )
@@ -14,7 +14,10 @@ import (
 // ItemsPage handles GET /items.
 func (s *Server) ItemsPage(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
-	items, _ := store.ListItems(r.Context(), s.DB, "")
+	items, err := store.ListItems(r.Context(), s.DB, "")
+	if err != nil {
+		slog.Error("failed to list items", "error", err)
+	}
 
 	s.Templates.Render(w, "items.html", &struct {
 		PageData
@@ -35,14 +38,28 @@ func (s *Server) ItemDetailPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item, err := store.GetItem(r.Context(), s.DB, id)
-	if err != nil || item == nil {
+	if err != nil {
+		slog.Error("failed to get item", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if item == nil {
 		http.Error(w, "item not found", http.StatusNotFound)
 		return
 	}
 
-	dist, _ := store.GetItemDistribution(r.Context(), s.DB, id)
-	history, _ := store.GetItemHistory(r.Context(), s.DB, id)
-	owners, _ := store.ListOwners(r.Context(), s.DB, "")
+	dist, err := store.GetItemDistribution(r.Context(), s.DB, id)
+	if err != nil {
+		slog.Error("failed to get item distribution", "error", err)
+	}
+	history, err := store.GetItemHistory(r.Context(), s.DB, id)
+	if err != nil {
+		slog.Error("failed to get item history", "error", err)
+	}
+	owners, err := store.ListOwners(r.Context(), s.DB, "")
+	if err != nil {
+		slog.Error("failed to list owners", "error", err)
+	}
 
 	s.Templates.Render(w, "item_detail.html", &struct {
 		PageData
@@ -77,8 +94,11 @@ func (s *Server) ItemCreateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.CreateItem(r.Context(), s.DB, name, description)
-	slog.Info("item created", "user", claims.Username, "item", name)
+	if _, err := store.CreateItem(r.Context(), s.DB, name, description); err != nil {
+		slog.Error("failed to create item", "error", err)
+	} else {
+		slog.Info("item created", "user", claims.Username, "item", name)
+	}
 	http.Redirect(w, r, "/items", http.StatusSeeOther)
 }
 
@@ -101,6 +121,7 @@ func (s *Server) ItemUpdateSubmit(w http.ResponseWriter, r *http.Request) {
 	status := r.FormValue("status")
 
 	if err := store.UpdateItem(r.Context(), s.DB, id, name, description, status); err != nil {
+		slog.Error("failed to update item", "error", err)
 		http.Error(w, "failed to update", http.StatusInternalServerError)
 		return
 	}
@@ -128,6 +149,7 @@ func (s *Server) ItemStockSubmit(w http.ResponseWriter, r *http.Request) {
 
 	userID := claims.UserID
 	if err := store.AddStock(r.Context(), s.DB, id, ownerID, quantity, &userID); err != nil {
+		slog.Warn("failed to add stock", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -166,26 +188,22 @@ func (s *Server) ItemImageSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, header, err := r.FormFile("image")
+	file, _, err := r.FormFile("image")
 	if err != nil {
 		http.Error(w, "image required", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	mime := header.Header.Get("Content-Type")
-	if mime != "image/jpeg" && mime != "image/png" && mime != "image/webp" {
-		http.Error(w, "invalid image type", http.StatusBadRequest)
-		return
-	}
-
-	data, err := io.ReadAll(file)
+	// Process the image: validate format by sniffing bytes, downscale, compress.
+	result, err := imaging.Process(file)
 	if err != nil {
-		http.Error(w, "failed to read image", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := store.SetItemImage(r.Context(), s.DB, id, data, mime); err != nil {
+	if err := store.SetItemImage(r.Context(), s.DB, id, result.Data, result.MIME); err != nil {
+		slog.Error("failed to save image", "error", err)
 		http.Error(w, "failed to save image", http.StatusInternalServerError)
 		return
 	}

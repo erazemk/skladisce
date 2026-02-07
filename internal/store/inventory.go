@@ -16,7 +16,8 @@ func ListInventory(ctx context.Context, db *sql.DB) ([]model.Inventory, error) {
 		 FROM inventory inv
 		 JOIN items i ON i.id = inv.item_id
 		 JOIN owners o ON o.id = inv.owner_id
-		 ORDER BY i.name, o.name`,
+		 ORDER BY i.name, o.name
+		 LIMIT 1000`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("listing inventory: %w", err)
@@ -40,9 +41,9 @@ func AddStock(ctx context.Context, db *sql.DB, itemID, ownerID int64, quantity i
 		return fmt.Errorf("quantity must be positive")
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := beginImmediate(ctx, db)
 	if err != nil {
-		return fmt.Errorf("beginning transaction: %w", err)
+		return err
 	}
 	defer tx.Rollback()
 
@@ -81,9 +82,9 @@ func AdjustInventory(ctx context.Context, db *sql.DB, itemID, ownerID int64, del
 		return fmt.Errorf("delta must be non-zero")
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := beginImmediate(ctx, db)
 	if err != nil {
-		return fmt.Errorf("beginning transaction: %w", err)
+		return err
 	}
 	defer tx.Rollback()
 

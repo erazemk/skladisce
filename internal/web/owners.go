@@ -13,7 +13,10 @@ import (
 // OwnersPage handles GET /owners.
 func (s *Server) OwnersPage(w http.ResponseWriter, r *http.Request) {
 	claims := GetWebClaims(r.Context())
-	owners, _ := store.ListOwners(r.Context(), s.DB, "")
+	owners, err := store.ListOwners(r.Context(), s.DB, "")
+	if err != nil {
+		slog.Error("failed to list owners", "error", err)
+	}
 
 	s.Templates.Render(w, "owners.html", &struct {
 		PageData
@@ -34,12 +37,20 @@ func (s *Server) OwnerDetailPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	owner, err := store.GetOwner(r.Context(), s.DB, id)
-	if err != nil || owner == nil {
+	if err != nil {
+		slog.Error("failed to get owner", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if owner == nil {
 		http.Error(w, "owner not found", http.StatusNotFound)
 		return
 	}
 
-	inventory, _ := store.GetOwnerInventory(r.Context(), s.DB, id)
+	inventory, err := store.GetOwnerInventory(r.Context(), s.DB, id)
+	if err != nil {
+		slog.Error("failed to get owner inventory", "error", err)
+	}
 
 	s.Templates.Render(w, "owner_detail.html", &struct {
 		PageData
@@ -68,8 +79,11 @@ func (s *Server) OwnerCreateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.CreateOwner(r.Context(), s.DB, name, ownerType)
-	slog.Info("owner created", "user", claims.Username, "owner", name, "type", ownerType)
+	if _, err := store.CreateOwner(r.Context(), s.DB, name, ownerType); err != nil {
+		slog.Error("failed to create owner", "error", err)
+	} else {
+		slog.Info("owner created", "user", claims.Username, "owner", name, "type", ownerType)
+	}
 	http.Redirect(w, r, "/owners", http.StatusSeeOther)
 }
 
@@ -93,7 +107,10 @@ func (s *Server) OwnerUpdateSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.UpdateOwner(r.Context(), s.DB, id, name)
-	slog.Info("owner updated", "user", claims.Username, "owner", name)
+	if err := store.UpdateOwner(r.Context(), s.DB, id, name); err != nil {
+		slog.Error("failed to update owner", "error", err)
+	} else {
+		slog.Info("owner updated", "user", claims.Username, "owner", name)
+	}
 	http.Redirect(w, r, fmt.Sprintf("/owners/%d", id), http.StatusSeeOther)
 }

@@ -36,6 +36,11 @@ func (h *TransfersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.FromOwnerID == req.ToOwnerID {
+		jsonError(w, http.StatusBadRequest, "cannot transfer to same owner")
+		return
+	}
+
 	claims := GetClaims(r.Context())
 	var userID *int64
 	if claims != nil {
@@ -44,7 +49,8 @@ func (h *TransfersHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	transfer, err := store.CreateTransfer(r.Context(), h.DB, req.ItemID, req.FromOwnerID, req.ToOwnerID, req.Quantity, req.Notes, userID)
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		slog.Warn("transfer failed", "error", err)
+		jsonError(w, http.StatusBadRequest, "transfer failed: insufficient quantity or invalid parameters")
 		return
 	}
 
@@ -78,6 +84,7 @@ func (h *TransfersHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	transfers, err := store.ListTransfers(r.Context(), h.DB, itemID, ownerID)
 	if err != nil {
+		slog.Error("failed to list transfers", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to list transfers")
 		return
 	}

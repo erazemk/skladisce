@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	golang.org/x/crypto v0.47.0
+	golang.org/x/image v0.35.0
 	modernc.org/sqlite v1.44.3
 )
 

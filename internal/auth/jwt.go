@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -18,13 +20,19 @@ type Claims struct {
 // TokenExpiry is the default token lifetime.
 const TokenExpiry = 7 * 24 * time.Hour
 
-// GenerateToken creates a new JWT for a user.
+// GenerateToken creates a new JWT for a user with a unique JTI.
 func GenerateToken(secret string, userID int64, username, role string) (string, error) {
+	jti, err := generateJTI()
+	if err != nil {
+		return "", fmt.Errorf("generating JTI: %w", err)
+	}
+
 	claims := Claims{
 		UserID:   userID,
 		Username: username,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -56,4 +64,13 @@ func ValidateToken(secret, tokenStr string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+// generateJTI creates a random token ID.
+func generateJTI() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }

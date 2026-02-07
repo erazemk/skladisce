@@ -32,6 +32,7 @@ type adjustRequest struct {
 func (h *InventoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	inventory, err := store.ListInventory(r.Context(), h.DB)
 	if err != nil {
+		slog.Error("failed to list inventory", "error", err)
 		jsonError(w, http.StatusInternalServerError, "failed to list inventory")
 		return
 	}
@@ -61,7 +62,8 @@ func (h *InventoryHandler) AddStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.AddStock(r.Context(), h.DB, req.ItemID, req.OwnerID, req.Quantity, userID); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		slog.Warn("failed to add stock", "error", err)
+		jsonError(w, http.StatusBadRequest, "failed to add stock: owner not found or invalid parameters")
 		return
 	}
 
@@ -99,7 +101,8 @@ func (h *InventoryHandler) Adjust(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := store.AdjustInventory(r.Context(), h.DB, req.ItemID, req.OwnerID, req.Delta, req.Notes, userID); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		slog.Warn("failed to adjust inventory", "error", err)
+		jsonError(w, http.StatusBadRequest, "adjustment failed: would result in negative quantity or invalid parameters")
 		return
 	}
 

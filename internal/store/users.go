@@ -101,25 +101,41 @@ func UpdateUser(ctx context.Context, db *sql.DB, id int64, role string) error {
 }
 
 // UpdateUserPassword updates a user's password hash.
+// Returns an error if the user does not exist or is soft-deleted.
 func UpdateUserPassword(ctx context.Context, db *sql.DB, id int64, passwordHash string) error {
-	_, err := db.ExecContext(ctx,
+	result, err := db.ExecContext(ctx,
 		`UPDATE users SET password_hash = ? WHERE id = ? AND deleted_at IS NULL`,
 		passwordHash, id,
 	)
 	if err != nil {
 		return fmt.Errorf("updating user password: %w", err)
 	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("updating user password: user not found")
+	}
 	return nil
 }
 
 // DeleteUser soft-deletes a user.
+// Returns an error if the user does not exist or is already deleted.
 func DeleteUser(ctx context.Context, db *sql.DB, id int64) error {
-	_, err := db.ExecContext(ctx,
+	result, err := db.ExecContext(ctx,
 		`UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`,
 		id,
 	)
 	if err != nil {
 		return fmt.Errorf("deleting user: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("deleting user: user not found")
 	}
 	return nil
 }
