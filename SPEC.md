@@ -145,7 +145,7 @@ Server listening on :8080
 **Flags:**
 - `-d`, `-db <path>` — SQLite database path (default: `skladisce.sqlite3`)
 - `-a`, `-addr <host:port>` — listen address (default: `:8080`)
-- `-u`, `-username <name>` — admin username on first run (default: `Admin`)
+- `-u`, `-user <name>` — admin username on first run (default: `Admin`)
 - `-h`, `-help` — show usage and exit with code 0
 - Invalid flags print usage to stderr and exit with code 1
 
