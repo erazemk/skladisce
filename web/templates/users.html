@@ -45,8 +45,13 @@
                 <td>{{.Username}}</td>
                 <td><span class="badge badge-{{.Role}}">{{roleName .Role}}</span></td>
                 <td>{{.CreatedAt.Format "02.01.2006"}}</td>
-                <td>
-                    <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani?" hx-target="closest tr" hx-swap="outerHTML">Izbriši</button>
+                <td class="flex gap-1">
+                    {{if ne .ID $.User.UserID}}
+                    <button class="btn btn-secondary btn-sm" onclick="openResetModal({{.ID}}, '{{.Username}}')">Ponastavi geslo</button>
+                    <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani, da želite izbrisati uporabnika {{.Username}}?" hx-target="closest tr" hx-swap="outerHTML">Izbriši</button>
+                    {{else}}
+                    <span style="color: var(--text-muted); font-style: italic">Trenutni uporabnik</span>
+                    {{end}}
                 </td>
             </tr>
             {{else}}
@@ -55,4 +60,37 @@
         </tbody>
     </table>
 </div>
+
+<!-- Password reset modal -->
+<div id="reset-modal" class="modal" style="display:none">
+    <div class="card" style="max-width:400px; margin:10vh auto">
+        <h2>Ponastavi geslo</h2>
+        <p>Novo geslo za uporabnika <strong id="reset-username"></strong>:</p>
+        <form method="POST" id="reset-form">
+            <div class="form-group">
+                <label for="new_password">Novo geslo</label>
+                <input type="password" id="new_password" name="new_password" required minlength="1">
+            </div>
+            <div class="flex gap-1">
+                <button type="submit" class="btn btn-primary">Ponastavi</button>
+                <button type="button" class="btn btn-secondary" onclick="closeResetModal()">Prekliči</button>
+            </div>
+        </form>
+    </div>
+</div>
+<style>
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
+</style>
+<script>
+function openResetModal(id, username) {
+    document.getElementById('reset-username').textContent = username;
+    document.getElementById('reset-form').action = '/users/' + id + '/password';
+    document.getElementById('new_password').value = '';
+    document.getElementById('reset-modal').style.display = 'block';
+    document.getElementById('new_password').focus();
+}
+function closeResetModal() {
+    document.getElementById('reset-modal').style.display = 'none';
+}
+</script>
 {{end}}

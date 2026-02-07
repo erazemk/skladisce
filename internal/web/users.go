@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -52,6 +53,36 @@ func (s *Server) UserCreateSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.CreateUser(r.Context(), s.DB, username, string(hash), role)
+	http.Redirect(w, r, "/users", http.StatusSeeOther)
+}
+
+// UserResetPasswordSubmit handles POST /users/{id}/password (admin only).
+func (s *Server) UserResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
+	claims := GetWebClaims(r.Context())
+	if !model.RoleAtLeast(claims.Role, model.RoleAdmin) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	newPassword := r.FormValue("new_password")
+	if newPassword == "" {
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	store.UpdateUserPassword(r.Context(), s.DB, id, string(hash))
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 

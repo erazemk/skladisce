@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -173,6 +174,69 @@ func TestRoleBasedAccess(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected 403 for user accessing users, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestSelfDeletionPrevented(t *testing.T) {
+	server, token := setupTestServer(t)
+
+	// Admin user has ID 1. Attempt to delete self.
+	req, _ := authRequest("DELETE", server.URL+"/api/users/1", token, nil)
+	resp, _ := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for self-deletion, got %d", resp.StatusCode)
+	}
+	var body map[string]string
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	if body["error"] != "cannot delete yourself" {
+		t.Errorf("expected 'cannot delete yourself' error, got %q", body["error"])
+	}
+}
+
+func TestAdminResetPassword(t *testing.T) {
+	server, token := setupTestServer(t)
+
+	// Create a regular user.
+	req, _ := authRequest("POST", server.URL+"/api/users", token, map[string]any{
+		"username": "user2",
+		"password": "oldpass",
+		"role":     "user",
+	})
+	resp, _ := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 creating user, got %d", resp.StatusCode)
+	}
+	var createdUser map[string]any
+	json.NewDecoder(resp.Body).Decode(&createdUser)
+	resp.Body.Close()
+
+	userID := int(createdUser["id"].(float64))
+
+	// Reset the user's password.
+	req, _ = authRequest("PUT", server.URL+fmt.Sprintf("/api/users/%d/password", userID), token, map[string]string{
+		"password": "newpass123",
+	})
+	resp, _ = http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 for password reset, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Verify login with new password works.
+	loginBody, _ := json.Marshal(map[string]string{"username": "user2", "password": "newpass123"})
+	resp, _ = http.Post(server.URL+"/api/auth/login", "application/json", bytes.NewReader(loginBody))
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 login with new password, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Verify login with old password fails.
+	loginBody, _ = json.Marshal(map[string]string{"username": "user2", "password": "oldpass"})
+	resp, _ = http.Post(server.URL+"/api/auth/login", "application/json", bytes.NewReader(loginBody))
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 login with old password, got %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 }
