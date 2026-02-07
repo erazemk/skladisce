@@ -9,7 +9,7 @@ for the full specification.
 make build          — CGO_ENABLED=0 go build -o skladisce ./cmd/server
 make test           — go test -timeout 10s ./...
 make lint           — go vet ./...
-make run            — build + run serve with default flags
+make run            — build + run with default flags
 make clean          — remove binary
 ```
 
@@ -58,6 +58,10 @@ Both API and web layers share the same `store` package — no logic duplication.
 - `docs:` documentation changes
 - `refactor:` code restructuring
 - `test:` adding/updating tests
+
+**Commit after every change.** Once `make build lint test` passes and the work
+is complete, stage all changes and commit immediately. Do not wait for the user
+to ask — committing is part of completing a task.
 
 ## Documentation as Source of Truth
 
