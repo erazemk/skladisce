@@ -48,7 +48,7 @@
                 <td class="flex gap-1">
                     {{if ne .ID $.User.UserID}}
                     <button class="btn btn-secondary btn-sm" onclick="openResetModal({{.ID}}, '{{.Username}}')">Ponastavi geslo</button>
-                    <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani, da želite izbrisati uporabnika {{.Username}}?" hx-target="closest tr" hx-swap="outerHTML">Izbriši</button>
+                    <button class="btn btn-danger btn-sm" hx-delete="/api/users/{{.ID}}" hx-headers='{"Authorization": "Bearer {{$.Token}}"}' hx-confirm="Ali ste prepričani, da želite izbrisati uporabnika {{.Username}}?" hx-target="closest tr" hx-swap="delete">Izbriši</button>
                     {{else}}
                     <span style="color: var(--text-muted); font-style: italic">Trenutni uporabnik</span>
                     {{end}}
